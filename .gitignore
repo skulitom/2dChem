@@ -1,57 +1,29 @@
-# Python
+# Python cache files
 __pycache__/
-*.py[cod]
+*.pyc
+*.pyo
+*.pyd
 *$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 
-# Virtual Environment
+# IDE files
+.vscode/
+.idea/
+
+# Environment and dependencies
 venv/
 env/
-ENV/
 .env
+requirements.txt.lock
+pip-lock.txt
 
-# IDE specific files
-.idea/
-.vscode/
-*.swp
-*.swo
+# System files
 .DS_Store
+Thumbs.db
 
-# Project specific
+# Pygame specific
+*.pgc
+*.pgo
+
+# Debug and logging
 *.log
-output/
-temp/
-*.bak
-
-# Documentation
-docs/_build/
-docs/generated/
-
-# Test coverage
-.coverage
-htmlcov/
-.tox/
-.nox/
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/ 
+debug/ 
