@@ -29,3 +29,11 @@ WHITE = Color(255, 255, 255)
 FIXED_TIMESTEP = 1/10  # Physics updates at 60Hz
 MAX_STEPS_PER_FRAME = 3
 VELOCITY_SCALE = 5.0  # New constant for initial velocity scaling
+
+# Element Colors
+ELEMENT_COLORS = {
+    'H': Color(255, 255, 255),    # White
+    'O': Color(255, 0, 0),        # Red
+    'N': Color(0, 0, 255),        # Blue
+    'C': Color(128, 128, 128),    # Gray
+}

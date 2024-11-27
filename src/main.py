@@ -5,7 +5,7 @@ from pygame import Surface
 
 from core.constants import (
     WINDOW_WIDTH, WINDOW_HEIGHT,
-    BLACK, WHITE
+    BLACK, WHITE, ELEMENT_COLORS
 )
 from physics.particle_system import ParticleSystem
 
@@ -29,6 +29,24 @@ class Simulation:
         
         # Store current delta time
         self.current_delta = 0.0
+        
+        # Element selection state
+        self.selected_element = 'H'  # Default to Hydrogen
+        self.element_font = pygame.font.Font(None, 24)
+        
+        # UI dimensions and layout
+        self.ui_padding = 10
+        self.tab_height = 40
+        self.tab_width = 60
+        self.tab_padding = 5
+        self.sidebar_width = 200
+        self.elements = ['H', 'O', 'N', 'C']
+        
+        # Create UI surfaces
+        self.sidebar = Surface((self.sidebar_width, WINDOW_HEIGHT))
+        self.element_tabs = Surface((WINDOW_WIDTH - self.sidebar_width, self.tab_height))
+        self.simulation_area = Surface((WINDOW_WIDTH - self.sidebar_width, 
+                                      WINDOW_HEIGHT - self.tab_height))
     
     def handle_events(self):
         for event in pygame.event.get():
@@ -36,43 +54,104 @@ class Simulation:
                 return False
             elif event.type == MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left click
-                    self.mouse_down = True
+                    mouse_pos = pygame.mouse.get_pos()
+                    # Adjust mouse position for element tabs
+                    if (mouse_pos[0] > self.sidebar_width and 
+                        mouse_pos[1] < self.tab_height):
+                        adjusted_x = mouse_pos[0] - self.sidebar_width
+                        tab_idx = adjusted_x // (self.tab_width + self.tab_padding)
+                        if tab_idx < len(self.elements):
+                            self.selected_element = self.elements[tab_idx]
+                    # Only allow particle creation in simulation area
+                    elif (mouse_pos[0] > self.sidebar_width and 
+                          mouse_pos[1] > self.tab_height):
+                        self.mouse_down = True
             elif event.type == MOUSEBUTTONUP:
-                if event.button == 1:  # Left click
+                if event.button == 1:
                     self.mouse_down = False
         return True
     
     def update(self):
-        self.current_delta = self.clock.get_time() / 1000.0  # Convert to seconds
+        self.current_delta = self.clock.get_time() / 1000.0
         
-        # Create particles at mouse position if mouse button is held
         if self.mouse_down:
             mouse_pos = pygame.mouse.get_pos()
-            self.particle_system.create_particle_burst(mouse_pos, self.current_delta)
+            # Adjust mouse position relative to simulation area
+            adjusted_pos = (
+                mouse_pos[0] - self.sidebar_width,
+                mouse_pos[1] - self.tab_height
+            )
+            self.particle_system.create_particle_burst(
+                adjusted_pos,
+                self.current_delta,
+                self.selected_element
+            )
         
-        # Update particle system
         self.particle_system.update(self.current_delta)
+    
+    def _draw_sidebar(self):
+        """Draw the sidebar with stats and info"""
+        self.sidebar.fill(BLACK)
+        
+        # Draw stats
+        y_offset = self.ui_padding
+        stats = [
+            f'FPS: {int(self.clock.get_fps())}',
+            f'Particles: {self.particle_system.active_particles}',
+            f'Selected: {self.selected_element}'
+        ]
+        
+        for stat in stats:
+            text = self.font.render(stat, True, WHITE)
+            self.sidebar.blit(text, (self.ui_padding, y_offset))
+            y_offset += 40
+        
+        # Draw sidebar border
+        pygame.draw.line(self.sidebar, WHITE, 
+                        (self.sidebar_width-1, 0), 
+                        (self.sidebar_width-1, WINDOW_HEIGHT), 1)
+    
+    def _draw_element_tabs(self):
+        """Draw the element selection tabs"""
+        self.element_tabs.fill(BLACK)
+        
+        for i, element in enumerate(self.elements):
+            x = i * (self.tab_width + self.tab_padding)
+            tab_rect = pygame.Rect(x, 0, self.tab_width, self.tab_height-1)
+            color = ELEMENT_COLORS[element]
+            
+            if element == self.selected_element:
+                pygame.draw.rect(self.element_tabs, color, tab_rect)
+                text_color = BLACK
+            else:
+                pygame.draw.rect(self.element_tabs, color, tab_rect, 2)
+                text_color = color
+            
+            text = self.element_font.render(element, True, text_color)
+            text_rect = text.get_rect(center=(x + self.tab_width/2, self.tab_height/2))
+            self.element_tabs.blit(text, text_rect)
+        
+        # Draw bottom border
+        pygame.draw.line(self.element_tabs, WHITE, 
+                        (0, self.tab_height-1), 
+                        (WINDOW_WIDTH - self.sidebar_width, self.tab_height-1), 1)
     
     def draw(self):
         self.screen.fill(BLACK)
         
-        # Draw particles
-        self.particle_system.draw(self.screen)
+        # Draw sidebar
+        self._draw_sidebar()
+        self.screen.blit(self.sidebar, (0, 0))
         
-        # Draw FPS, particle count, and delta time
-        fps_text = self.font.render(f'FPS: {int(self.clock.get_fps())}', True, WHITE)
-        particle_text = self.font.render(
-            f'Particles: {self.particle_system.active_particles}',
-            True, WHITE
-        )
-        delta_text = self.font.render(
-            f'Delta: {self.current_delta:.4f}s',
-            True, WHITE
-        )
+        # Draw element tabs
+        self._draw_element_tabs()
+        self.screen.blit(self.element_tabs, (self.sidebar_width, 0))
         
-        self.screen.blit(fps_text, (10, 10))
-        self.screen.blit(particle_text, (10, 50))
-        self.screen.blit(delta_text, (10, 90))
+        # Draw simulation area (particles)
+        self.simulation_area.fill(BLACK)
+        self.particle_system.draw(self.simulation_area)
+        self.screen.blit(self.simulation_area, 
+                        (self.sidebar_width, self.tab_height))
         
         pygame.display.flip()
     
