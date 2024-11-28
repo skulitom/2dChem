@@ -149,7 +149,7 @@ class Simulation:
         # Draw simulation area (particles)
         self.simulation_area.fill(BLACK)
         render_particles(self.simulation_area, self.particles_1)
-        render_grid(self.simulation_area)
+        render_grid(self.simulation_area, self.particles_1)
         self.screen.blit(self.simulation_area, 
                         (self.sidebar_width, self.tab_height))
         

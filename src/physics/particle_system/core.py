@@ -2,10 +2,10 @@ import numpy as np
 from core.constants import (
     WINDOW_WIDTH, WINDOW_HEIGHT,
     PARTICLE_SPREAD, VELOCITY_SCALE,
-    SIMULATION_FRAME_X_OFFSET, SIMULATION_FRAME_Y_OFFSET,
-    SIMULATION_FRAME_WIDTH, SIMULATION_FRAME_HEIGHT
+    SIMULATION_WIDTH, SIMULATION_HEIGHT
 )
 from physics.chemical_particle import ChemicalParticle
+from utils.profiler import profile_function
 
 __all__ = ['ParticleSystemCore']
 
@@ -28,10 +28,11 @@ class ParticleSystemCore:
 
     def _initialize_grid(self):
         """Initialize the simulation grid."""
-        self.grid_size_x = SIMULATION_FRAME_WIDTH
-        self.grid_size_y = SIMULATION_FRAME_HEIGHT
+        self.grid_size_x = SIMULATION_WIDTH
+        self.grid_size_y = SIMULATION_HEIGHT
         self.grid = np.zeros((self.grid_size_x, self.grid_size_y), dtype=np.int32)
 
+    @profile_function(threshold_ms=1.0)
     def create_particle_burst(self, pos, delta_time, element_type='H', burst_size=None):
         """
         Create a burst of particles at a given position.
@@ -55,8 +56,8 @@ class ParticleSystemCore:
         new_velocities = np.random.uniform(-0.5, 0.5, (new_count, 2)) * VELOCITY_SCALE
 
         # Clip positions to window boundaries
-        np.clip(new_positions[:, 0], 0, SIMULATION_FRAME_WIDTH - 1, out=new_positions[:, 0])
-        np.clip(new_positions[:, 1], 0, SIMULATION_FRAME_HEIGHT - 1, out=new_positions[:, 1])
+        np.clip(new_positions[:, 0], 0, WINDOW_WIDTH - 1, out=new_positions[:, 0])
+        np.clip(new_positions[:, 1], 0, WINDOW_HEIGHT - 1, out=new_positions[:, 1])
 
         # Update particle arrays
         start_idx = self.active_particles
@@ -70,3 +71,9 @@ class ParticleSystemCore:
         # Initialize chemical properties for new particles
         for i in range(start_idx, end_idx):
             self.chemical_properties[i] = ChemicalParticle(element_type, i)
+
+    def clear_particles(self):
+        """Clear all particles from the system."""
+        self.active_particles = 0
+        self.active_mask.fill(False)
+        self.chemical_properties.clear()

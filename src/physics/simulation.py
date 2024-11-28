@@ -3,7 +3,7 @@ import numpy as np
 from physics.particle_data import ParticleData
 
 from core.constants import (
-    SIMULATION_FRAME_WIDTH, SIMULATION_FRAME_HEIGHT
+    SIMULATION_WIDTH, SIMULATION_HEIGHT
 )
 SIMULATION_STEP = 0.1
 
@@ -16,18 +16,21 @@ def _solve_positions(particle_data : ParticleData):
 
 def _solve_borders_constrains(particle_data : ParticleData):
     active_mask = np.arange(particle_data.num_of_particles)
-    bottom_mask = active_mask[particle_data.positions[active_mask, 1] >= SIMULATION_FRAME_HEIGHT]
+    bottom_mask = active_mask[particle_data.positions[active_mask, 1] >= SIMULATION_HEIGHT]
 
-    particle_data.positions[bottom_mask, 1] = SIMULATION_FRAME_HEIGHT - 1
+    particle_data.positions[bottom_mask, 1] = SIMULATION_HEIGHT - 1
     particle_data.velocities[bottom_mask, 1] = 0
 
     left_mask = active_mask[particle_data.positions[active_mask, 0] <= 0]
     particle_data.positions[left_mask, 0] = 1
     particle_data.velocities[left_mask, 0] = 0
 
-    right_mask = active_mask[particle_data.positions[active_mask, 0] >= SIMULATION_FRAME_WIDTH]
-    particle_data.positions[right_mask, 0] = SIMULATION_FRAME_WIDTH - 1
+    right_mask = active_mask[particle_data.positions[active_mask, 0] >= SIMULATION_WIDTH]
+    particle_data.positions[right_mask, 0] = SIMULATION_WIDTH - 1
     particle_data.velocities[right_mask, 0] = 0
+
+#def _populate_grid(particle_data : ParticleData):
+#    for id, position in np.
 
 def _solve_self_collisions(particle_data : ParticleData):
     collisions_mask = np.empty((0, 2), dtype=int)
@@ -53,9 +56,10 @@ def _solve_self_collisions(particle_data : ParticleData):
                 particle_data.positions[right_el_id] = mid_point - vector * particle_data.radius
 
 def solve(particle_data_list : list):
-    for particle_data in particle_data_list:
-        _solve_velocities(particle_data)
-        _solve_positions(particle_data)
-        _solve_self_collisions(particle_data)
-        _solve_borders_constrains(particle_data)
+    pass
+#    for particle_data in particle_data_list:
+#        _solve_velocities(particle_data)
+#        _solve_positions(particle_data)
+#        _solve_self_collisions(particle_data)
+#        _solve_borders_constrains(particle_data)
 

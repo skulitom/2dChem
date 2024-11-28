@@ -6,10 +6,10 @@ from pygame import Surface
 from core.constants import (
     WINDOW_WIDTH, WINDOW_HEIGHT,
     BLACK, WHITE, ELEMENT_COLORS,
-    UI_COLORS,
-    SIMULATION_FRAME_X_OFFSET, SIMULATION_FRAME_Y_OFFSET
+    UI_COLORS
 )
 from physics.particle_system import ParticleSystem
+from utils.profiler import Profiler
 
 class Simulation:
     def __init__(self):
@@ -22,6 +22,8 @@ class Simulation:
         self._init_display()
         self._init_state()
         self._init_surfaces()
+        self.profiler = Profiler()
+        self.profiler.start()
     
     def _init_ui_config(self):
         """Initialize UI configuration values"""
@@ -34,6 +36,7 @@ class Simulation:
         self.element_font = pygame.font.Font(None, 28)
         self.stats_font = pygame.font.Font(None, 24)
         self.corner_radius = 5
+        self.button_height = 30
     
     def _init_display(self):
         """Initialize display and timing components"""
@@ -48,13 +51,11 @@ class Simulation:
         self.mouse_down = False
         self.current_delta = 0.0
         self.selected_element = 'H'  # Default to Hydrogen
-        self.sidebar_width = SIMULATION_FRAME_X_OFFSET
-        self.tab_height = SIMULATION_FRAME_Y_OFFSET
-        self.particles_per_burst = 5  # Initialize with a default value
+        self.particles_per_burst = 10  # Default particles per burst
     
     def _init_surfaces(self):
         """Initialize UI surfaces"""
-        self.sidebar = Surface((SIMULATION_FRAME_X_OFFSET, WINDOW_HEIGHT))
+        self.sidebar = Surface((self.sidebar_width, WINDOW_HEIGHT))
         self.element_tabs = Surface((WINDOW_WIDTH - self.sidebar_width, self.tab_height))
         self.simulation_area = Surface((
             WINDOW_WIDTH - self.sidebar_width,
@@ -79,6 +80,18 @@ class Simulation:
     def _handle_mouse_down(self, event):
         """Handle mouse down event"""
         mouse_pos = pygame.mouse.get_pos()
+        
+        # Check if clear button was clicked
+        button_rect = pygame.Rect(
+            self.ui_padding,
+            self.ui_padding * 2 + 35 * 4 + 10,  # Position after stats
+            self.sidebar_width - (self.ui_padding * 2),
+            self.button_height
+        )
+        
+        if button_rect.collidepoint(mouse_pos):
+            self.particle_system.clear_particles()
+            return
         
         if self._is_in_element_tabs(mouse_pos):
             self._handle_tab_selection(mouse_pos)
@@ -129,16 +142,38 @@ class Simulation:
             f'FPS: {int(self.clock.get_fps())}',
             f'Particles: {self.particle_system.active_particles}',
             f'Selected: {self.selected_element}',
-            f'Burst Size: {self.particles_per_burst}/click'  # Add burst size display
+            f'Burst Size: {self.particles_per_burst}/click'
         ]
         
         for stat in stats:
             text = self.stats_font.render(stat, True, UI_COLORS['TEXT'])
-            # Add subtle text shadow
             shadow = self.stats_font.render(stat, True, (0, 0, 0))
             self.sidebar.blit(shadow, (self.ui_padding + 1, y_offset + 1))
             self.sidebar.blit(text, (self.ui_padding, y_offset))
             y_offset += 35
+        
+        # Add Clear button
+        button_rect = pygame.Rect(
+            self.ui_padding,
+            y_offset + 10,
+            self.sidebar_width - (self.ui_padding * 2),
+            self.button_height
+        )
+        
+        # Check if mouse is hovering over button
+        mouse_pos = pygame.mouse.get_pos()
+        adjusted_pos = (mouse_pos[0], mouse_pos[1])
+        button_hovered = button_rect.collidepoint(adjusted_pos)
+        
+        # Draw button with hover effect
+        button_color = UI_COLORS['TAB_HOVER'] if button_hovered else UI_COLORS['PANEL']
+        pygame.draw.rect(self.sidebar, button_color, button_rect, border_radius=self.corner_radius)
+        pygame.draw.rect(self.sidebar, UI_COLORS['BORDER'], button_rect, 1, border_radius=self.corner_radius)
+        
+        # Draw button text
+        clear_text = self.stats_font.render("Clear Particles", True, UI_COLORS['TEXT'])
+        text_rect = clear_text.get_rect(center=button_rect.center)
+        self.sidebar.blit(clear_text, text_rect)
         
         # Draw a subtle gradient border
         for i in range(2):
@@ -234,6 +269,7 @@ class Simulation:
             self.draw()
             self.clock.tick(60)
         
+        self.profiler.stop()  # Stop profiling before exit
         pygame.quit()
         sys.exit()
 
