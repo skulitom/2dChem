@@ -6,58 +6,91 @@ from core.element_data import ELEMENT_DATA, ElementProperties
 @dataclass
 class Bond:
     particle_id: int
-    bond_type: str
+    bond_type: str  # 'covalent', 'ionic', or 'metallic'
     strength: float
-    angle: Optional[float] = None  # Store bond angle for proper geometry
+    shared_electrons: int  # Number of electrons shared (2 for single, 4 for double, 6 for triple)
+    angle: Optional[float] = None
 
 class ChemicalParticle:
     def __init__(self, element_id: str, particle_id: int):
         self.element_data: ElementProperties = ELEMENT_DATA[element_id]
         self.particle_id = particle_id
         self.bonds: List[Bond] = []
+        
+        # 2D-specific electron configuration
+        self.valence_electrons = self.element_data.valence_electrons
         self.current_charge = 0
+        self.electron_configuration = self._init_2d_electron_config()
+        
+        # Physical state properties
         self.temperature = 298.15  # Room temperature in Kelvin
+        self.phase_state = self.element_data.phase_state
         self.energy = 0.0
         
-        # 2D-specific properties
-        self.electron_count = self.element_data.valence_electrons
-        self.orbital_occupancy = self._init_orbital_occupancy()
+        # Hybridization and geometry
         self.hybridization = None
-        self.bond_angles = {}
+        self.preferred_geometry = self._determine_preferred_geometry()
+
+    def _init_2d_electron_config(self) -> Dict[str, int]:
+        """Initialize 2D electron configuration following sextet rule"""
+        config = {}
+        remaining_electrons = self.valence_electrons
         
-    def _init_orbital_occupancy(self) -> Dict[str, int]:
-        """Initialize electron orbital occupancy based on 2D rules"""
-        occupancy = {}
-        config = self.element_data.electron_configuration
+        # Fill orbitals according to 2D rules
+        orbital_order = ['1s', '2s', '2p', '3s', '3p', '3d']
+        max_electrons = {'s': 2, 'p': 4, 'd': 4, 'f': 4}  # 2D orbital capacities
         
-        for orbital, count in config.items():
-            # In 2D, p orbitals can only hold 4 electrons (2 orbitals × 2 electrons)
-            if orbital.endswith('p'):
-                occupancy[orbital] = min(count, 4)
-            else:
-                occupancy[orbital] = count
-        return occupancy
-    
-    def can_bond_with(self, other: 'ChemicalParticle') -> bool:
-        # Check sextet rule (max 6 valence electrons in 2D)
-        if self.electron_count >= 6 or other.electron_count >= 6:
-            return False
+        for orbital in orbital_order:
+            if remaining_electrons <= 0:
+                break
+            orbital_type = orbital[-1]
+            capacity = max_electrons[orbital_type]
+            electrons_added = min(remaining_electrons, capacity)
+            config[orbital] = electrons_added
+            remaining_electrons -= electrons_added
             
-        # Additional 2D-specific checks
+        return config
+
+    def _determine_preferred_geometry(self) -> Dict[str, float]:
+        """Determine preferred bond angles based on valence electrons"""
+        valence = self.valence_electrons
+        if valence <= 2:
+            return {'linear': 180.0}
+        elif valence <= 4:
+            return {'trigonal': 120.0}
+        else:
+            return {'triangular': 120.0}  # 2D equivalent of tetrahedral
+
+    def can_form_ionic_bond(self, other: 'ChemicalParticle') -> bool:
+        """Check if ionic bond formation is possible based on electronegativity"""
+        en_diff = abs(self.element_data.electronegativity - other.element_data.electronegativity)
+        return en_diff > 1.7  # Threshold for ionic bonding
+
+    def can_bond_with(self, other: 'ChemicalParticle', distance: float) -> bool:
+        # Check sextet rule (max 6 valence electrons in 2D)
+        if len(self.bonds) >= 3 or len(other.bonds) >= 3:  # Max 3 bonds in 2D
+            return False
+
+        # Check if ionic or covalent bonding is possible
+        if self.can_form_ionic_bond(other):
+            return True
+
+        # Check covalent bonding possibility
         if other.element_data.id in self.element_data.possible_bonds:
             bond_info = self.element_data.possible_bonds[other.element_data.id]
             
-            # Check planar geometry constraints
-            if len(self.bonds) >= 3:  # Max 3 bonds in 2D
+            # Check distance threshold
+            bond_distance = (self.element_data.radius + other.element_data.radius) * 1.2
+            if distance > bond_distance:
                 return False
-                
-            # Check bond angle constraints
+            
+            # Check geometry constraints
             if len(self.bonds) > 0:
                 return self._check_2d_geometry_constraints(other)
             
             return True
         return False
-    
+
     def _check_2d_geometry_constraints(self, other: 'ChemicalParticle') -> bool:
         """Check if new bond would satisfy 2D geometry constraints"""
         if len(self.bonds) == 0:
@@ -86,6 +119,7 @@ class ChemicalParticle:
             particle_id=other.particle_id,
             bond_type=bond_info['type'],
             strength=bond_info['strength'],
+            shared_electrons=bond_info['shared_electrons'],
             angle=bond_info.get('angle')
         )
         

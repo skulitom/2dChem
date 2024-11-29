@@ -4,9 +4,12 @@ from core.constants import (
     FIXED_TIMESTEP,
     BOND_DISTANCE_THRESHOLD,
     ELECTROMAGNETIC_CONSTANT,
-    COLLISION_DAMPING
+    COLLISION_DAMPING,
+    ACTIVATION_ENERGY_THRESHOLD
 )
 from utils.profiler import profile_function
+from physics.chemical_particle import Bond
+from typing import Optional
 
 class CollisionHandler:
     @staticmethod
@@ -15,32 +18,87 @@ class CollisionHandler:
         pos_diff = system.positions[current_idx] - system.positions[other_idx]
         distance = np.linalg.norm(pos_diff)
         
-        # Early exit conditions
         if distance >= 3.0 or distance == 0:
             return
-        
-        # Calculate electromagnetic force (1/r in 2D instead of 1/r²)
-        direction = pos_diff / distance
-        force_magnitude = (
-            ELECTROMAGNETIC_CONSTANT * 
-            system.chemical_properties[current_idx].current_charge * 
-            system.chemical_properties[other_idx].current_charge
-        ) / distance
-        
-        # Apply electromagnetic force
-        force = direction * force_magnitude
-        system.velocities[current_idx] += force * FIXED_TIMESTEP
-        system.velocities[other_idx] -= force * FIXED_TIMESTEP
-        
-        # Handle chemical bonding
-        if distance < BOND_DISTANCE_THRESHOLD:
-            current_chem = system.chemical_properties[current_idx]
-            other_chem = system.chemical_properties[other_idx]
             
-            # Check for bond formation based on 2D rules
-            if (current_chem.can_bond_with(other_chem) and 
-                CollisionHandler._check_bond_angle_validity(system, current_idx, other_idx)):
-                current_chem.try_form_bond(other_chem, distance)
+        current_chem = system.chemical_properties[current_idx]
+        other_chem = system.chemical_properties[other_idx]
+        
+        # Calculate collision energy
+        relative_velocity = system.velocities[current_idx] - system.velocities[other_idx]
+        collision_energy = 0.5 * np.linalg.norm(relative_velocity) ** 2
+        
+        # Handle different types of interactions
+        if current_chem.can_form_ionic_bond(other_chem):
+            CollisionHandler._handle_ionic_interaction(system, current_idx, other_idx, collision_energy)
+        elif current_chem.can_bond_with(other_chem, distance):
+            CollisionHandler._handle_covalent_interaction(system, current_idx, other_idx, distance, collision_energy)
+        else:
+            CollisionHandler._handle_regular_collision(system, current_idx, other_idx, pos_diff, distance)
+
+    @staticmethod
+    def _handle_ionic_interaction(system, idx1, idx2, collision_energy):
+        chem1 = system.chemical_properties[idx1]
+        chem2 = system.chemical_properties[idx2]
+        
+        # Check if energy is sufficient for electron transfer
+        if collision_energy > ACTIVATION_ENERGY_THRESHOLD:
+            # Transfer electron from lower to higher electronegativity
+            if chem1.element_data.electronegativity > chem2.element_data.electronegativity:
+                donor, acceptor = chem2, chem1
+            else:
+                donor, acceptor = chem1, chem2
+                
+            donor.current_charge += 1
+            acceptor.current_charge -= 1
+            donor.valence_electrons -= 1
+            acceptor.valence_electrons += 1
+
+    @staticmethod
+    def _handle_covalent_interaction(system, idx1, idx2, distance, collision_energy):
+        chem1 = system.chemical_properties[idx1]
+        chem2 = system.chemical_properties[idx2]
+        
+        if collision_energy > ACTIVATION_ENERGY_THRESHOLD * 0.5:  # Lower threshold for covalent bonds
+            # Check bond angle constraints
+            angle = CollisionHandler._calculate_bond_angle(system, idx1, idx2)
+            if angle is not None:
+                # Get expected angle based on hybridization
+                expected_angle = chem1.preferred_geometry.get('trigonal', 120.0)
+                if abs(angle - expected_angle) > 30.0:  # Allow 30-degree deviation
+                    return  # Angle not suitable for bonding
+            
+            # Determine number of electrons to share based on valence
+            shared_electrons = min(
+                2,  # Start with single bonds for simplicity
+                chem1.valence_electrons,
+                chem2.valence_electrons
+            )
+            
+            if shared_electrons > 0:
+                # Create bonds in both directions
+                bond1 = Bond(
+                    particle_id=idx2,
+                    bond_type='covalent',
+                    strength=1.0,
+                    shared_electrons=shared_electrons,
+                    angle=angle
+                )
+                bond2 = Bond(
+                    particle_id=idx1,
+                    bond_type='covalent',
+                    strength=1.0,
+                    shared_electrons=shared_electrons,
+                    angle=None  # Only store angle on one side
+                )
+                
+                chem1.bonds.append(bond1)
+                chem2.bonds.append(bond2)
+                
+                # Update velocities to reflect bond formation
+                avg_velocity = (system.velocities[idx1] + system.velocities[idx2]) * 0.5
+                system.velocities[idx1] = avg_velocity * 0.9  # Add some damping
+                system.velocities[idx2] = avg_velocity * 0.9
 
     @staticmethod
     @profile_function(threshold_ms=0.5)
@@ -139,3 +197,56 @@ class CollisionHandler:
             chem.break_all_bonds()
         elif chem.temperature <= chem.element_data.melting_point:
             system.velocities[idx] *= 0.8
+
+    @staticmethod
+    def _calculate_bond_angle(system, idx1, idx2) -> Optional[float]:
+        """Calculate the angle between existing bonds and potential new bond"""
+        particle1 = system.chemical_properties[idx1]
+        
+        if len(particle1.bonds) == 0:
+            return None  # No existing bonds to form angle with
+            
+        pos1 = system.positions[idx1]
+        pos2 = system.positions[idx2]
+        
+        # If there's one existing bond, calculate angle with it
+        if len(particle1.bonds) == 1:
+            existing_bond = particle1.bonds[0]
+            pos_existing = system.positions[existing_bond.particle_id]
+            
+            # Calculate vectors
+            vec1 = pos_existing - pos1
+            vec2 = pos2 - pos1
+            
+            # Calculate angle between vectors
+            dot_product = np.dot(vec1, vec2)
+            magnitudes = np.linalg.norm(vec1) * np.linalg.norm(vec2)
+            
+            if magnitudes == 0:
+                return None
+                
+            cos_angle = dot_product / magnitudes
+            angle = np.arccos(np.clip(cos_angle, -1.0, 1.0)) * 180 / np.pi
+            return angle
+            
+        # If there are two existing bonds, calculate both angles
+        elif len(particle1.bonds) == 2:
+            angles = []
+            for bond in particle1.bonds:
+                pos_existing = system.positions[bond.particle_id]
+                vec1 = pos_existing - pos1
+                vec2 = pos2 - pos1
+                
+                dot_product = np.dot(vec1, vec2)
+                magnitudes = np.linalg.norm(vec1) * np.linalg.norm(vec2)
+                
+                if magnitudes == 0:
+                    continue
+                    
+                cos_angle = dot_product / magnitudes
+                angle = np.arccos(np.clip(cos_angle, -1.0, 1.0)) * 180 / np.pi
+                angles.append(angle)
+                
+            return min(angles) if angles else None
+            
+        return None
