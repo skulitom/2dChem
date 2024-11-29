@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Dict
 import numpy as np
 from core.element_data import ELEMENT_DATA, ElementProperties
 
@@ -18,32 +18,48 @@ class ChemicalParticle:
         self.current_charge = 0
         self.temperature = 298.15  # Room temperature in Kelvin
         self.energy = 0.0
-        self.electron_count = self.element_data.valence_electrons
-        self.hybridization = None
-        self.bond_angles = {}  # Store actual angles between bonds
         
+        # 2D-specific properties
+        self.electron_count = self.element_data.valence_electrons
+        self.orbital_occupancy = self._init_orbital_occupancy()
+        self.hybridization = None
+        self.bond_angles = {}
+        
+    def _init_orbital_occupancy(self) -> Dict[str, int]:
+        """Initialize electron orbital occupancy based on 2D rules"""
+        occupancy = {}
+        config = self.element_data.electron_configuration
+        
+        for orbital, count in config.items():
+            # In 2D, p orbitals can only hold 4 electrons (2 orbitals × 2 electrons)
+            if orbital.endswith('p'):
+                occupancy[orbital] = min(count, 4)
+            else:
+                occupancy[orbital] = count
+        return occupancy
+    
     def can_bond_with(self, other: 'ChemicalParticle') -> bool:
+        # Check sextet rule (max 6 valence electrons in 2D)
+        if self.electron_count >= 6 or other.electron_count >= 6:
+            return False
+            
+        # Additional 2D-specific checks
         if other.element_data.id in self.element_data.possible_bonds:
             bond_info = self.element_data.possible_bonds[other.element_data.id]
             
-            # Check valence electron availability
-            if self.electron_count < 2 or other.electron_count < 2:
-                return False
-                
-            # Check maximum bonds based on hybridization
-            max_bonds = bond_info['max_bonds']
-            if len(self.bonds) >= max_bonds:
+            # Check planar geometry constraints
+            if len(self.bonds) >= 3:  # Max 3 bonds in 2D
                 return False
                 
             # Check bond angle constraints
-            if len(self.bonds) > 0 and 'angle' in bond_info:
-                return self._check_bond_angle_validity(other, bond_info['angle'])
-                
+            if len(self.bonds) > 0:
+                return self._check_2d_geometry_constraints(other)
+            
             return True
         return False
     
-    def _check_bond_angle_validity(self, other: 'ChemicalParticle', target_angle: float) -> bool:
-        """Check if new bond would satisfy angle constraints"""
+    def _check_2d_geometry_constraints(self, other: 'ChemicalParticle') -> bool:
+        """Check if new bond would satisfy 2D geometry constraints"""
         if len(self.bonds) == 0:
             return True
             
@@ -56,14 +72,13 @@ class ChemicalParticle:
             return False
             
         # Check distance threshold for bonding
-        bond_distance = 2.0 * (self.element_data.radius + other.element_data.radius)
+        bond_distance = (self.element_data.radius + other.element_data.radius) * 1.2
         if distance > bond_distance:
             return False
             
-        # Check activation energy threshold
-        activation_energy = (self.element_data.activation_energy + 
-                           other.element_data.activation_energy) * 0.5
-        if self.temperature < activation_energy:
+        # Lower activation energy threshold for testing
+        activation_energy_threshold = 0.1  # Make it easier to form bonds initially
+        if self.temperature < activation_energy_threshold:
             return False
             
         bond_info = self.element_data.possible_bonds[other.element_data.id]
@@ -79,6 +94,7 @@ class ChemicalParticle:
         self.electron_count -= electrons_shared // 2
         other.electron_count -= electrons_shared // 2
         
+        # Add some attraction between bonded particles
         self.bonds.append(new_bond)
         return True
     

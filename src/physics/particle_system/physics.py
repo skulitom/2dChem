@@ -7,6 +7,7 @@ class PhysicsHandler:
     @profile_function(threshold_ms=1.0)
     def update(self, system, delta_time):
         if system.active_particles > 0:
+            system.active_particles = min(system.active_particles, len(system.positions))
             self._fixed_update(system, FIXED_TIMESTEP)
     
     @profile_function(threshold_ms=0.5)
@@ -21,11 +22,10 @@ class PhysicsHandler:
 
     @profile_function(threshold_ms=0.5)
     def _update_velocities(self, system, dt):
-        system.velocities[:system.active_particles] += np.array([0, GRAVITY * dt])
+        active_mask = np.arange(len(system.positions)) < system.active_particles
+        system.velocities[active_mask] += np.array([0, GRAVITY * dt])
         
-        mask = (system.positions[:system.active_particles, 1] < (WINDOW_HEIGHT - 1)) & \
-               (system.velocities[:system.active_particles, 1] < 0.5)
-        system.velocities[:system.active_particles, 1][mask] = 0.5
+        np.clip(system.velocities[active_mask, 1], -20, 20, out=system.velocities[active_mask, 1])
 
     @profile_function(threshold_ms=0.5)
     def _update_positions(self, system, dt):
@@ -37,24 +37,31 @@ class PhysicsHandler:
         positions = system.positions[:system.active_particles]
         velocities = system.velocities[:system.active_particles]
         
+        # Add bounds checking for y-coordinate
+        np.clip(positions[:, 1], 0, system.grid_size_y - 2, out=positions[:, 1])
+        
         # Process all boundaries at once using masks
-        bottom_mask = positions[:, 1] >= system.grid_size_y - 1
-        left_mask = positions[:, 0] < 0
-        right_mask = positions[:, 0] >= system.grid_size_x - 1
+        bottom_mask = positions[:, 1] >= system.grid_size_y - 4  # Increased buffer zone
+        left_mask = positions[:, 0] < 2
+        right_mask = positions[:, 0] >= system.grid_size_x - 2
         
         # Apply boundary conditions using vectorized operations
-        positions[bottom_mask, 1] = system.grid_size_y - 1
-        positions[left_mask, 0] = 0
-        positions[right_mask, 0] = system.grid_size_x - 1
+        positions[bottom_mask, 1] = system.grid_size_y - 4  # Keep particles further from edge
+        positions[left_mask, 0] = 2
+        positions[right_mask, 0] = system.grid_size_x - 2
         
-        # Update velocities
-        velocities[bottom_mask, 1] *= -COLLISION_RESPONSE
+        # Update velocities with stronger collision response for floor
+        velocities[bottom_mask, 1] *= -COLLISION_RESPONSE * 1.2  # Increased bounce response
         velocities[left_mask, 0] = np.abs(velocities[left_mask, 0]) * COLLISION_RESPONSE
         velocities[right_mask, 0] = -np.abs(velocities[right_mask, 0]) * COLLISION_RESPONSE
         
-        # Add random horizontal velocity to bottom collisions
+        # Ensure particles at bottom have enough upward velocity
+        floor_particles = bottom_mask & (np.abs(velocities[:, 1]) < 0.5)
+        velocities[floor_particles, 1] = 0.5
+        
+        # Add random horizontal velocity to bottom collisions to prevent stacking
         if np.any(bottom_mask):
-            velocities[bottom_mask, 0] += np.random.uniform(-0.3, 0.3, np.sum(bottom_mask))
+            velocities[bottom_mask, 0] += np.random.uniform(-0.5, 0.5, np.sum(bottom_mask))
 
     @profile_function(threshold_ms=0.5)
     def _handle_collisions(self, system):

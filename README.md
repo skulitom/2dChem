@@ -1,165 +1,235 @@
 # 2D Chemistry Simulation Game
-A powder-game style physics simulation exploring chemical interactions in a 2D world.
+
+A powder-game style physics simulation exploring chemical interactions in a two-dimensional universe.
 
 ## Scientific Foundation: 2D Chemical Physics
 
-### 2D Electron Configuration Theory
-In our 2D universe, quantum mechanics operates differently:
+In a two-dimensional (2D) universe, fundamental physical laws such as quantum mechanics and electromagnetism still govern the behavior of particles, but their manifestations differ due to reduced dimensionality. Electrons orbit atomic nuclei, forming atoms and molecules, but the structures of electron orbitals, energy levels, and the periodic table are distinct from those in our three-dimensional (3D) world.
 
-1. **Electron Shell Structure**
-   - 1st shell (n=1): 2 electrons (1s²)
-   - 2nd shell (n=2): 6 electrons (2s², 2p⁴)
-   - 3rd shell (n=3): 10 electrons (3s², 3p⁴, 3d⁴)
-   - 4th shell (n=4): 14 electrons (4s², 4p⁴, 4d⁴, 4f⁴)
+### Electromagnetic Force in 2D
 
-2. **Orbital Theory in 2D**
-   - s-orbitals: Circular symmetry (2 electrons)
-   - p-orbitals: 2 lobes × 2 orientations (4 electrons)
-   - d-orbitals: 4 orientations (4 electrons)
-   - f-orbitals: 4 orientations (4 electrons)
+In 3D space, the electromagnetic force between two point charges follows Coulomb's Law, which states that the force is inversely proportional to the square of the distance between them (1/r²). This is because the electric field spreads out over the surface area of a sphere, scaling with r².
 
-3. **Valence Rules**
-   - Octet rule becomes "Sextet rule" (6 electrons)
-   - Maximum valence electrons: 6
-   - Hybridization patterns: sp¹, sp²
+In 2D space, the electric field spreads over the circumference of a circle, which scales linearly with r. Consequently, the electromagnetic force in 2D follows an inverse linear law (1/r). This fundamental difference significantly alters the potential energy of electrons in atoms and the spacing of energy levels.
 
-### Chemical Bonding in 2D
+## 2D Quantum Mechanics and Electron Orbitals
 
-1. **Covalent Bonding**
-   - Single bonds: 2 electrons
-   - Double bonds: 4 electrons
-   - Triple bonds: 6 electrons (maximum possible)
-   - Bond angles: 120° for sp² hybridization
+### Quantum Numbers in 2D
 
-2. **Ionic Bonding**
-   - Modified electronegativity scale
-   - Maximum charge states: ±3
-   - Crystal lattice structures in 2D
+- **Principal Quantum Number (n)**: Indicates the energy level or shell of an electron, with n = 1, 2, 3, ...
+- **Angular Momentum Quantum Number (l)**: In 2D, l can take integer values from 0 up to (n - 1).
+- **Magnetic Quantum Number (mₛ)**: In 2D, for each l > 0, there are only two possible orientations corresponding to the electron orbiting clockwise or counterclockwise (mₛ = ±l).
+- **Spin Quantum Number (mₛ)**: Electrons have spin quantum numbers of +½ or -½.
 
-3. **Intermolecular Forces**
-   - Van der Waals forces
-   - 2D hydrogen bonding
-   - Dipole-dipole interactions
+### Electron Orbitals in 2D
 
-### Thermodynamics & Kinetics
+- **s Orbitals (l = 0)**:
+  - Shape: Circular symmetry.
+  - Number of Orbitals: 1.
+  - Electrons per Orbital: 2 (due to spin).
+- **p, d, f, ... Orbitals (l > 0)**:
+  - For each l > 0, there are 2 orbitals (mₛ = +l and mₛ = -l).
+  - Electrons per Orbital: 2.
+  - Total Electrons per l Level: 2 orbitals × 2 electrons = 4 electrons.
 
-1. **State Properties**
-   - Temperature affects particle velocity
-   - Pressure calculated from particle collisions
-   - Volume becomes area in 2D
+### Electron Shell Structure in 2D
 
-2. **Phase Transitions**
-   - Modified phase diagrams
-   - Critical points adjusted for 2D
-   - Surface tension effects
+- **First Shell (n = 1)**:
+  - l = 0.
+  - Total Electrons: 1 orbital × 2 electrons = 2 electrons.
+- **Second Shell (n = 2)**:
+  - l = 0 and l = 1.
+  - Total Electrons:
+    - l = 0: 1 orbital × 2 electrons = 2 electrons.
+    - l = 1: 2 orbitals × 2 electrons = 4 electrons.
+  - **Total for n = 2**: 6 electrons.
+- **Third Shell (n = 3)**:
+  - l = 0, 1, 2.
+  - Total Electrons:
+    - l = 0: 2 electrons.
+    - l = 1: 4 electrons.
+    - l = 2: 4 electrons.
+  - **Total for n = 3**: 10 electrons.
+- **Fourth Shell (n = 4)**:
+  - l = 0, 1, 2, 3.
+  - Total Electrons:
+    - l = 0: 2 electrons.
+    - l = 1: 4 electrons.
+    - l = 2: 4 electrons.
+    - l = 3: 4 electrons.
+  - **Total for n = 4**: 14 electrons.
 
-3. **Reaction Kinetics**
-   - Collision theory modified for 2D
-   - Activation energy barriers
-   - Catalyst behavior
+### Filling Order of Orbitals
+
+In 2D, the energy levels of orbitals depend on both n and l, but the change in the electromagnetic force law (from 1/r² to 1/r) alters the energy ordering compared to 3D. Generally, energy increases with n and l, but specific calculations are required to determine the exact order in which orbitals fill.
+
+## Valence Electrons and the "Sextet Rule"
+
+- **Valence Electrons**: Electrons in the outermost shell (highest n) determine the chemical properties of an element.
+- **Sextet Rule**: Atoms tend to achieve six valence electrons in their outer shell for stability, analogous to the octet rule in 3D. This is due to the maximum of six electrons in the second shell (n = 2).
+
+## The 2D Periodic Table
+
+Due to differences in electron orbital structures and energy levels, the periodic table in 2D has a unique arrangement. Periods correspond to the filling of electron shells, and groups contain elements with similar valence electron configurations and chemical properties.
+
+### Notable Differences from the 3D Periodic Table
+
+- **Noble Gases**: Elements with a full valence shell of six electrons are noble gases in 2D (e.g., elements with 2, 6, 12, 20 electrons).
+- **Halogens**: Elements with five valence electrons, needing one more to complete the sextet, are highly reactive non-metals.
+- **Alkali Metals**: Elements with one valence electron are highly reactive metals.
+- **Transition Metals**: The filling of d and higher orbitals differs, leading to variations in the transition metal series.
+
+## Chemical Bonding in 2D
+
+### Covalent Bonding
+
+- **Electron Sharing**: Atoms share electrons to achieve a full sextet in their valence shell.
+- **Bond Types**:
+  - **Single Bonds**: Sharing one pair of electrons (2 electrons).
+  - **Double Bonds**: Sharing two pairs of electrons (4 electrons).
+  - **Triple Bonds**: Sharing three pairs of electrons (6 electrons), the maximum due to the sextet rule.
+- **Molecular Geometry**:
+  - **Planar Structures**: Molecules are inherently planar in 2D, influencing bond angles and shapes.
+  - **Bond Angles**: Determined by hybridization; for example, sp² hybridization results in 120° angles.
+
+### Ionic Bonding
+
+- **Electron Transfer**: Atoms with low electronegativity lose electrons to atoms with high electronegativity, forming ions.
+- **Electrostatic Attraction**: Positive and negative ions attract, forming ionic compounds.
+- **2D Lattice Structures**: Ionic compounds arrange in planar crystal lattices.
+
+### Metallic Bonding
+
+- **Delocalized Electrons**: Valence electrons are shared among all metal atoms, allowing for conductivity.
+- **Planar Metal Structures**: Metals form continuous 2D sheets.
+
+### Intermolecular Forces
+
+- **Dipole-Dipole Interactions**: Occur between polar molecules.
+- **Van der Waals Forces**: Weak attractions due to temporary dipoles.
+- **Hydrogen Bonding**: Strong dipole interactions involving hydrogen bonded to electronegative atoms.
+
+## Thermodynamics and Kinetics in 2D
+
+### State Properties
+
+- **Temperature**: Measures average kinetic energy in the 2D plane.
+- **Pressure**: Force per unit length in 2D (since area reduces to length).
+- **Area Instead of Volume**: Thermodynamic equations adjust for two dimensions.
+
+### Phase Transitions
+
+- **Modified Phase Diagrams**: Reflect 2D pressure and temperature relationships.
+- **Critical Points**: Adjusted due to changes in intermolecular forces and dimensionality.
+
+### Reaction Kinetics
+
+- **Collision Theory**: In 2D, particles collide differently, affecting reaction rates.
+- **Activation Energy**: Minimum energy required for a reaction to occur.
+- **Catalysts**: Lower activation energy, increasing reaction rates without being consumed.
 
 ## Technical Implementation Details
 
 ### Particle Physics Engine
 
-1. **Force Calculations**
+- **Force Calculations**: Simulate interactions based on the 1/r electromagnetic force law specific to 2D space.
+- **Quantum Mechanics Approximation**: Simplify quantum behaviors to create a playable simulation while retaining scientific accuracy.
+- **Collision Detection**: Implement efficient algorithms for detecting and handling collisions in a 2D environment.
+
+### Simulation Mechanics
+
+- **Planar Dynamics**: All particle motions and interactions occur within a two-dimensional plane.
+- **Visual Representation**: Use colors, shapes, and animations to represent different elements and compounds.
+- **User Interaction**: Players can introduce elements, adjust environmental conditions, and observe resulting behaviors.
 
 ## Element System Design
 
 ### Basic Element Properties
 
-1. **Physical Properties**
-   - Mass: Affects particle movement and interactions
-   - Radius: Determines collision detection area
-   - Base Color: Visual representation
-   - Phase State: Default state (solid, liquid, gas)
-   - Density: Affects stacking and fluid behavior
-
-2. **Chemical Properties**
-   - Atomic Number: 1-36 (simplified periodic table)
-   - Valence Electrons: 0-6 (following 2D electron configuration)
-   - Electronegativity: 0.0-4.0 scale
-   - Reactivity: 0-100 scale
-   - Oxidation States: Possible charge states in 2D
-
-3. **Behavioral Properties**
-   - Temperature Range
-     * Melting Point
-     * Boiling Point
-     * Decomposition Temperature
-   - State Changes
-     * Phase transition effects
-     * Energy absorption/release
-   - Special Behaviors
-     * Magnetic properties
-     * Radioactive decay
-     * Catalytic properties
+- **Physical Properties**
+  - **Mass**: Determines inertia and response to forces.
+  - **Radius**: Affects collision detection and interaction range.
+  - **Color**: Visual identifier for elements and compounds.
+  - **Phase State**: Default state under standard conditions (solid, liquid, gas).
+  - **Density**: Influences buoyancy and layering in fluids.
+- **Chemical Properties**
+  - **Atomic Number**: Number of protons/electrons defining the element.
+  - **Electron Configuration**: Based on 2D orbital structures.
+  - **Valence Electrons**: Up to 6 in the outermost shell.
+  - **Electronegativity**: Ability to attract electrons in a bond.
+  - **Reactivity**: Likelihood to participate in chemical reactions.
+  - **Oxidation States**: Possible ionic charges.
+- **Behavioral Properties**
+  - **Temperature Ranges**:
+    - **Melting Point**
+    - **Boiling Point**
+    - **Sublimation Point**
+  - **State Changes**: Energy absorption or release during phase transitions.
+  - **Special Behaviors**:
+    - **Magnetism**
+    - **Radioactivity**
+    - **Catalytic Activity**
 
 ### Element Categories
 
-1. **Basic Elements**
-   - 2D-Hydrogen (H): Single electron, highly reactive
-   - 2D-Helium (He): Two electrons, inert
-   - 2D-Lithium (Li): Single valence electron, metallic
-   - 2D-Carbon (C): Forms 3 bonds maximum
-   - 2D-Nitrogen (N): Forms 3 bonds with lone pair
-   - 2D-Oxygen (O): Forms 2 bonds with 2 lone pairs
+- **Noble Gases**
+  - **Properties**: Full valence shell (6 electrons), chemically inert.
+  - **Examples**: Elements with electron configurations ending in a filled shell.
+- **Halogens**
+  - **Properties**: Five valence electrons, highly reactive, form negative ions.
+  - **Examples**: Elements seeking one electron to complete their sextet.
+- **Alkali Metals**
+  - **Properties**: One valence electron, highly reactive, form positive ions.
+  - **Examples**: Elements readily losing an electron to achieve a full inner shell.
+- **Transition Metals**
+  - **Properties**: Involve filling of l > 1 orbitals, exhibit multiple oxidation states.
+  - **2D Considerations**: Adjusted orbital filling due to altered energy levels.
 
-2. **Metals**
-   - Properties:
-     * Positive charge when ionized
-     * Electron delocalization
-     * Metallic bonding in 2D
-   - Examples: Li, Na, K, Fe, Cu, Au
+## Interaction Rules
 
-3. **Non-metals**
-   - Properties:
-     * Negative charge when ionized
-     * Covalent bonding
-     * Molecular structures
-   - Examples: H, C, N, O, F, Cl
+### Bonding Mechanics
 
-4. **Noble Elements**
-   - Properties:
-     * Full outer shell (6 electrons)
-     * Extremely low reactivity
-     * No natural bonding
-   - Examples: He, Ne, Ar
+- **Formation Criteria**:
+  - **Proximity**: Atoms must be close enough to interact.
+  - **Energy**: Sufficient energy must be available for bond formation.
+  - **Electron Configuration**: Determines bonding capacity.
+- **Bond Types**:
+  - **Covalent Bonds**: Electron sharing between non-metals.
+  - **Ionic Bonds**: Electron transfer between metals and non-metals.
+  - **Metallic Bonds**: Delocalized electrons among metal atoms.
 
-### Interaction Rules
+### Reaction Conditions
 
-1. **Bonding Mechanics**
-   - Bond Formation
-     * Distance threshold for interaction
-     * Energy requirements
-     * Electron sharing calculations
-   - Bond Types
-     * Covalent bonds (1-3 pairs)
-     * Ionic bonds (charge transfer)
-     * Metallic bonds (electron sea)
+- **Temperature Effects**:
+  - **Reaction Rates**: Increase with temperature due to higher kinetic energy.
+  - **Phase Changes**: Substances may change states with temperature variations.
+- **Pressure Effects**:
+  - **Collision Frequency**: Higher pressure increases collision rates.
+  - **Reaction Equilibrium**: Can shift with changes in pressure.
 
-2. **Reaction Conditions**
-   - Temperature Effects
-     * Reaction rate modification
-     * Bond stability
-     * Phase transitions
-   - Pressure Effects
-     * Collision frequency
-     * Reaction probability
-     * Compression behavior
+### Special Interactions
 
-3. **Special Interactions**
-   - Catalysis
-     * Reaction pathway modification
-     * Energy barrier reduction
-   - Electron Transfer
-     * Redox reactions
-     * Charge distribution
-   - Decomposition
-     * Temperature-based
-     * Collision-based
-     * Radioactive decay
+- **Catalysis**:
+  - **Mechanism**: Catalysts provide alternative pathways with lower activation energy.
+- **Redox Reactions**:
+  - **Electron Transfer**: Involves oxidation (loss) and reduction (gain) of electrons.
+- **Decomposition and Decay**:
+  - **Thermal Decomposition**: Breakdown due to heat.
+  - **Radioactivity**: Unstable nuclei emitting particles.
 
-### Implementation Structure
+## Implementation Structure
 
-1. **Element Data Format**
+### Element Data Format
+
+- **Data Fields**:
+  - **Physical Properties**: Mass, radius, density, phase state, color.
+  - **Chemical Properties**: Atomic number, electron configuration, valence electrons, electronegativity, oxidation states.
+  - **Behavioral Properties**: Temperature thresholds, reactivity, special behaviors.
+- **Storage**: Elements are defined in data files or databases for easy access and modification.
+
+### Interaction Algorithms
+
+- **Forces and Movements**: Simulate electromagnetic forces, gravity (if applicable), and particle dynamics.
+- **Chemical Reactions**: Implement rules for bond formation and breaking based on element properties and environmental conditions.
+- **State Changes**: Handle phase transitions and associated energy changes.
+
