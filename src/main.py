@@ -68,7 +68,12 @@ class Simulation:
                 return False
             elif event.type == MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left click
-                    self._handle_mouse_down(event)
+                    if self._handle_mouse_down(event):
+                        # If clear button was clicked, ensure mouse_down is False
+                        self.mouse_down = False
+                        # Force a redraw
+                        self.draw()
+                        pygame.display.flip()
                 elif event.button == 4:  # Mouse wheel up
                     self.particles_per_burst = min(100, self.particles_per_burst + 5)
                 elif event.button == 5:  # Mouse wheel down
@@ -81,22 +86,34 @@ class Simulation:
         """Handle mouse down event"""
         mouse_pos = pygame.mouse.get_pos()
         
-        # Check if clear button was clicked
+        # Calculate button position the same way as in _draw_sidebar
+        y_offset = self.ui_padding * 2 + (40 * 4)  # 4 stats * 40 pixels each
+        
         button_rect = pygame.Rect(
             self.ui_padding,
-            self.ui_padding * 2 + 35 * 4 + 10,  # Position after stats
+            y_offset + 10,
             self.sidebar_width - (self.ui_padding * 2),
             self.button_height
         )
         
-        if button_rect.collidepoint(mouse_pos):
-            self.particle_system.clear_particles()
-            return
+        # Check if clear button was clicked
+        if mouse_pos[0] < self.sidebar_width:  # Only check if click is in sidebar
+            if button_rect.collidepoint(mouse_pos):
+                print("Clear button clicked")  # Debug print
+                self.particle_system.clear_particles()
+                # Force a GPU reset if needed
+                if hasattr(self.particle_system.physics, '_init_gpu'):
+                    self.particle_system.physics._init_gpu()
+                # Force immediate update of particle system
+                self.particle_system.update(self.current_delta)
+                return True
         
         if self._is_in_element_tabs(mouse_pos):
             self._handle_tab_selection(mouse_pos)
         elif self._is_in_simulation_area(mouse_pos):
             self.mouse_down = True
+        
+        return False
     
     def _is_in_element_tabs(self, pos):
         """Check if position is in element tabs area"""
@@ -175,37 +192,34 @@ class Simulation:
             
             y_offset += 40
 
-        # Draw Clear button with refined styling
-        button_rect = pygame.Rect(
+        # Store the button position for consistent reference
+        self.clear_button_rect = pygame.Rect(
             self.ui_padding,
             y_offset + 10,
             self.sidebar_width - (self.ui_padding * 2),
             self.button_height
         )
         
-        mouse_pos = pygame.mouse.get_pos()
-        button_hovered = button_rect.collidepoint(mouse_pos)
-        
-        # Smoother button gradient
-        gradient_surface = pygame.Surface(button_rect.size, pygame.SRCALPHA)
-        height = button_rect.height
+        # Draw Clear button using stored rect
+        gradient_surface = pygame.Surface(self.clear_button_rect.size, pygame.SRCALPHA)
+        height = self.clear_button_rect.height
         for i in range(height):
             progress = i / height
             alpha = int(255 * (1 - progress * 0.2))  # Subtler gradient
-            color = UI_COLORS['TAB_HOVER'] if button_hovered else UI_COLORS['PANEL']
+            color = UI_COLORS['TAB_HOVER'] if self.clear_button_rect.collidepoint(pygame.mouse.get_pos()) else UI_COLORS['PANEL']
             color = (*color, alpha)
             pygame.draw.line(gradient_surface, color, 
-                            (0, i), (button_rect.width, i))
+                            (0, i), (self.clear_button_rect.width, i))
         
         # Apply gradient and border
-        self.sidebar.blit(gradient_surface, button_rect)
-        pygame.draw.rect(self.sidebar, UI_COLORS['BORDER'], button_rect, 1,
+        self.sidebar.blit(gradient_surface, self.clear_button_rect)
+        pygame.draw.rect(self.sidebar, UI_COLORS['BORDER'], self.clear_button_rect, 1,
                         border_radius=self.corner_radius)
         
         # Clean button text rendering
         clear_text = self.stats_font.render("Clear Particles", True, 
-                                          UI_COLORS['HIGHLIGHT'] if button_hovered else UI_COLORS['TEXT'])
-        text_rect = clear_text.get_rect(center=button_rect.center)
+                                          UI_COLORS['HIGHLIGHT'] if self.clear_button_rect.collidepoint(pygame.mouse.get_pos()) else UI_COLORS['TEXT'])
+        text_rect = clear_text.get_rect(center=self.clear_button_rect.center)
         self.sidebar.blit(clear_text, text_rect)
     
     def _draw_element_tabs(self):

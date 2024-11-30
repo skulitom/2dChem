@@ -96,7 +96,7 @@ SIMULATION_HEIGHT = WINDOW_HEIGHT - SIMULATION_Y_OFFSET
 
 # Add or update these constants
 MAX_VELOCITY = 30.0
-FLOOR_BUFFER = 20
+FLOOR_BUFFER = 10  # Small buffer from bottom of screen
 MIN_BOUNCE_VELOCITY = 0.1
 
 # 2D Physics Constants

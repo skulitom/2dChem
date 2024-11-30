@@ -433,17 +433,25 @@ class ChemicalParticle:
             return min(self.valence_electrons, 3)  # Maximum of 3 bonds in 2D
 
     def can_form_covalent_bond(self, other: 'ChemicalParticle') -> bool:
-        """Check if covalent bond formation is possible"""
-        # Check if both atoms can accept more bonds
-        if len(self.bonds) >= self.max_bonds or len(other.bonds) >= other.max_bonds:
-            return False
-            
-        # Check if hybridization states are compatible
-        if self.hybridization_state and other.hybridization_state:
-            if self.hybridization_state != other.hybridization_state:
-                return False
-            
-        # Check if valence electrons allow for bonding
-        available_electrons = min(self.valence_electrons - self.bonding_electrons * 2,
-                                other.valence_electrons - other.bonding_electrons * 2)
-        return available_electrons >= 2
+        """Check if covalent bond formation is possible based on 2D sextet rule"""
+        # Check current number of valence electrons
+        total_valence = self.valence_electrons + other.valence_electrons
+        
+        # Check if bonding would exceed sextet (6 electrons) for either atom
+        self_after_bond = self.valence_electrons + 1
+        other_after_bond = other.valence_electrons + 1
+        
+        # In 2D, atoms are stable with 2 or 6 electrons (sextet rule)
+        stable_counts = [2, 6]
+        
+        # Check if bond formation would lead to stable configurations
+        would_be_stable = (
+            self_after_bond in stable_counts or
+            other_after_bond in stable_counts
+        )
+        
+        return (
+            len(self.bonds) < self.max_bonds and
+            len(other.bonds) < other.max_bonds and
+            would_be_stable
+        )

@@ -87,6 +87,16 @@ class ParticleSystemCore:
         self.active_particles = 0
         self.active_mask.fill(False)
         self.chemical_properties.clear()
+        # Reset arrays to ensure complete cleanup
+        self.positions.fill(0)
+        self.velocities.fill(0)
+        self.element_types.fill('')
+        # Reset any GPU resources if they exist
+        if hasattr(self, 'physics'):
+            if hasattr(self.physics, 'positions_gpu'):
+                del self.physics.positions_gpu
+            if hasattr(self.physics, 'velocities_gpu'):
+                del self.physics.velocities_gpu
 
     def create_particle(self, position, element_type):
         """Create a new particle"""
@@ -137,9 +147,9 @@ class ParticleSystemCore:
             offset = np.random.uniform(-spread, spread, 2)
             new_pos = np.array(pos) + offset
             
-            # Clip positions to window boundaries with simulation offsets
-            new_pos[0] = np.clip(new_pos[0], SIMULATION_X_OFFSET, SIMULATION_WIDTH - 1)
-            new_pos[1] = np.clip(new_pos[1], SIMULATION_Y_OFFSET, SIMULATION_HEIGHT - 1)
+            # Clip positions to simulation area
+            new_pos[0] = np.clip(new_pos[0], 0, SIMULATION_WIDTH - 1)
+            new_pos[1] = np.clip(new_pos[1], 0, SIMULATION_HEIGHT - 1)
             
             # Create particle
             idx = self.create_particle(new_pos, element_type)

@@ -100,6 +100,31 @@ def calculate_particle_density(positions, active_particles, grid_size=32):
             
     return np.max(density_grid)
 
+@cuda.jit
+def calculate_electromagnetic_forces(positions, charges, forces):
+    idx = cuda.grid(1)
+    if idx < positions.shape[0]:
+        force_x = 0.0
+        force_y = 0.0
+        
+        # Calculate electromagnetic forces using 2D inverse law (1/r)
+        for j in range(positions.shape[0]):
+            if j != idx:
+                dx = positions[j, 0] - positions[idx, 0]
+                dy = positions[j, 1] - positions[idx, 1]
+                r = math.sqrt(dx * dx + dy * dy)
+                
+                if r > 1e-6:  # Avoid division by zero
+                    # Use 1/r for 2D electromagnetic force
+                    force_magnitude = ELECTROMAGNETIC_CONSTANT * charges[idx] * charges[j] / r
+                    
+                    # Calculate force components
+                    force_x += force_magnitude * dx / r
+                    force_y += force_magnitude * dy / r
+        
+        forces[idx, 0] = force_x
+        forces[idx, 1] = force_y
+
 class PhysicsHandler:
     def __init__(self):
         self.use_gpu = False
@@ -156,9 +181,9 @@ class PhysicsHandler:
         positions = system.positions[active_slice]
         velocities = system.velocities[active_slice]
         
-        # Define boundaries with proper offsets
-        left_boundary = PARTICLE_RADIUS * 2
-        right_boundary = WINDOW_WIDTH - PARTICLE_RADIUS * 2
+        # Define boundaries relative to simulation area
+        left_boundary = 0
+        right_boundary = SIMULATION_WIDTH - PARTICLE_RADIUS
         floor_level = SIMULATION_HEIGHT - FLOOR_BUFFER - PARTICLE_RADIUS
         
         # Handle horizontal boundaries
@@ -276,12 +301,12 @@ class PhysicsHandler:
         positions[floor_collision, 1] = floor_level
         velocities[floor_collision, 1] *= -COLLISION_RESPONSE
         
-        # Wall collisions
-        left_wall = positions[:, 0] < PARTICLE_RADIUS * 2
-        right_wall = positions[:, 0] > WINDOW_WIDTH - PARTICLE_RADIUS * 2
+        # Wall collisions - use simulation area boundaries
+        left_wall = positions[:, 0] < 0
+        right_wall = positions[:, 0] > SIMULATION_WIDTH - PARTICLE_RADIUS
         
-        positions[left_wall, 0] = PARTICLE_RADIUS * 2
-        positions[right_wall, 0] = WINDOW_WIDTH - PARTICLE_RADIUS * 2
+        positions[left_wall, 0] = 0
+        positions[right_wall, 0] = SIMULATION_WIDTH - PARTICLE_RADIUS
         
         velocities[left_wall, 0] *= -COLLISION_RESPONSE
         velocities[right_wall, 0] *= -COLLISION_RESPONSE

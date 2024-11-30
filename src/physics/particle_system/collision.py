@@ -5,7 +5,8 @@ from core.constants import (
     BOND_DISTANCE_THRESHOLD,
     ELECTROMAGNETIC_CONSTANT,
     COLLISION_DAMPING,
-    ACTIVATION_ENERGY_THRESHOLD
+    ACTIVATION_ENERGY_THRESHOLD,
+    BOND_ANGLE_TOLERANCE
 )
 from utils.profiler import profile_function
 from physics.chemical_particle import Bond
@@ -376,35 +377,26 @@ class CollisionHandler:
 
     @staticmethod
     def _check_bond_angle_validity(system, idx1, idx2) -> bool:
-        """Check if new bond would satisfy 2D geometry constraints"""
-        particle1 = system.chemical_properties[idx1]
+        """Check if bond formation would satisfy 2D geometry constraints"""
+        chem1 = system.chemical_properties[idx1]
+        chem2 = system.chemical_properties[idx2]
         
-        if len(particle1.bonds) == 0:
-            return True
-            
-        # Get positions for angle calculations
-        pos1 = system.positions[idx1]
-        pos2 = system.positions[idx2]
+        # Get hybridization states
+        hybrid1 = chem1.hybridization_state
+        hybrid2 = chem2.hybridization_state
         
-        # Check angles with existing bonds
-        for bond in particle1.bonds:
-            pos_bonded = system.positions[bond.particle_id]
-            
-            # Calculate vectors
-            vec1 = pos_bonded - pos1
-            vec2 = pos2 - pos1
-            
-            # Calculate angle between bonds
-            cos_angle = np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
-            angle = np.arccos(np.clip(cos_angle, -1.0, 1.0)) * 180 / np.pi
-            
-            # Get expected angle based on hybridization
-            expected_angle = particle1.element_data.bond_angles.get(
-                particle1.hybridization or 'sp2', 120.0
-            )
-            
-            # Allow some deviation from ideal angle
-            if abs(angle - expected_angle) > 15.0:  # 15 degrees tolerance
+        # 2D-specific angle constraints
+        if hybrid1 == 'sp':
+            target_angle = 180.0  # Linear in 2D
+        elif hybrid1 == 'sp2':
+            target_angle = 120.0  # Trigonal planar in 2D
+        else:
+            return True  # No specific angle constraint
+        
+        # Check existing bonds' angles
+        for bond in chem1.bonds:
+            angle = system.calculate_bond_angle(idx1, bond.particle_id, idx2)
+            if abs(angle - target_angle) > BOND_ANGLE_TOLERANCE:
                 return False
                 
         return True
