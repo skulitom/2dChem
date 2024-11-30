@@ -2,8 +2,10 @@ import pygame
 import numpy as np
 from core.constants import (
     WINDOW_WIDTH, WINDOW_HEIGHT, 
-    PARTICLE_RADIUS, ELEMENT_COLORS
+    PARTICLE_RADIUS,
+    ELEMENT_COLORS
 )
+from core.element_data import ELEMENT_DATA
 from utils.profiler import profile_function
 
 class ParticleRenderer:
@@ -13,14 +15,31 @@ class ParticleRenderer:
         self.particle_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), flags).convert_alpha()
         self.bond_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), flags).convert_alpha()
         
-        # Create element surface cache with hardware acceleration
+        # Create element surface cache with hardware acceleration and varying sizes
         self.element_surface_cache = {}
         print("\nInitializing element surfaces:")
-        for element, color in ELEMENT_COLORS.items():
-            print(f"Creating surface for {element} with color {color}")
-            surf = pygame.Surface((PARTICLE_RADIUS * 2, PARTICLE_RADIUS * 2), pygame.SRCALPHA | pygame.HWSURFACE)
-            pygame.draw.circle(surf, color, (PARTICLE_RADIUS, PARTICLE_RADIUS), PARTICLE_RADIUS)
-            self.element_surface_cache[element] = surf.convert_alpha()
+        for element_id, properties in ELEMENT_DATA.items():
+            # Scale radius based on element's atomic radius (reduced scaling factor)
+            display_radius = int(properties.radius * 20)  # Reduced from 40 to 20
+            print(f"Creating surface for {element_id} with radius {display_radius}")
+            
+            # Create surface large enough for the element plus outline
+            surf_size = (display_radius + 2) * 2  # +2 for outline
+            surf = pygame.Surface((surf_size, surf_size), pygame.SRCALPHA | pygame.HWSURFACE)
+            
+            # Draw outline (black circle slightly larger than the element)
+            center = (surf_size // 2, surf_size // 2)
+            pygame.draw.circle(surf, (0, 0, 0), center, display_radius + 1)
+            
+            # Draw the element circle
+            color = properties.color
+            pygame.draw.circle(surf, color, center, display_radius)
+            
+            # Store both the surface and the radius for later use
+            self.element_surface_cache[element_id] = {
+                'surface': surf.convert_alpha(),
+                'radius': display_radius + 1  # Include outline in radius
+            }
 
     @profile_function(threshold_ms=1.0)
     def draw(self, system, screen):
@@ -40,10 +59,13 @@ class ParticleRenderer:
             
             # Use cached element surface
             if element_id in self.element_surface_cache:
-                element_surf = self.element_surface_cache[element_id]
+                element_data = self.element_surface_cache[element_id]
+                element_surf = element_data['surface']
+                radius = element_data['radius']
+                
                 screen_pos = (
-                    int(pos[0] - PARTICLE_RADIUS),
-                    int(pos[1] - PARTICLE_RADIUS)
+                    int(pos[0] - radius),
+                    int(pos[1] - radius)
                 )
                 self.particle_surface.blit(element_surf, screen_pos)
         

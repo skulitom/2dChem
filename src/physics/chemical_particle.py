@@ -158,9 +158,13 @@ class ChemicalParticle:
         if len(self.bonds) >= 3 or len(other.bonds) >= 3:
             return False
 
-        # More lenient distance check
-        min_dist = (self.element_data.radius + other.element_data.radius) * 0.9
-        max_dist = (self.element_data.radius + other.element_data.radius) * 3.0  # Increased from 2.5
+        # Calculate exact bonding distance based on radii (scaled to match display)
+        combined_radius = (self.element_data.radius + other.element_data.radius) * 20  # Match display scaling
+        
+        # In 2D, particles should touch exactly at their edges for bonding
+        # Allow only a very small tolerance for numerical stability
+        min_dist = combined_radius * 0.95  # 5% tolerance below
+        max_dist = combined_radius * 1.05  # 5% tolerance above
         
         if not (min_dist <= distance <= max_dist):
             return False

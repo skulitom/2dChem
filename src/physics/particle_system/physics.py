@@ -4,17 +4,18 @@ import math
 from core.constants import (
     GRAVITY, WINDOW_HEIGHT, WINDOW_WIDTH, COLLISION_RESPONSE, 
     FIXED_TIMESTEP, MAX_VELOCITY, PARTICLE_RADIUS, FLOOR_BUFFER, MIN_BOUNCE_VELOCITY,
-    SIMULATION_HEIGHT, SIMULATION_WIDTH, SIMULATION_Y_OFFSET, SIMULATION_X_OFFSET
+    SIMULATION_HEIGHT, SIMULATION_WIDTH, SIMULATION_Y_OFFSET, SIMULATION_X_OFFSET,
+    ELECTROMAGNETIC_CONSTANT
 )
 from utils.profiler import profile_function
 
-# Optimized CUDA constants
+# Physics constants
 CUDA_MAX_VELOCITY = 20.0
 CUDA_GRAVITY = 4.0
-CUDA_COLLISION_RESPONSE = 0.3
+CUDA_COLLISION_RESPONSE = 1.0
 THREADS_PER_BLOCK = 128
 MAX_BLOCKS = 256
-COLLISION_DISTANCE = PARTICLE_RADIUS * 4.0  # Increased from 2.0
+MIN_SEPARATION = PARTICLE_RADIUS * 2.2  # Slightly larger than diameter to ensure no overlap
 
 @cuda.jit
 def update_positions_gpu(positions, velocities, dt):
@@ -32,58 +33,43 @@ def update_velocities_gpu(velocities, dt):
         velocities[idx, 0] = min(max(velocities[idx, 0], -CUDA_MAX_VELOCITY), CUDA_MAX_VELOCITY)
 
 @cuda.jit
-def handle_collisions_gpu(positions, velocities, active_particles):
+def enforce_minimum_distance_gpu(positions, velocities, active_particles):
+    """Enforce minimum distance between all particles"""
     particle_idx = cuda.grid(1)
     if particle_idx >= active_particles:
         return
-
+        
     pos_x = positions[particle_idx, 0]
     pos_y = positions[particle_idx, 1]
-    vel_x = velocities[particle_idx, 0]
-    vel_y = velocities[particle_idx, 1]
     
-    # Check collisions with nearby particles
     for other_idx in range(active_particles):
         if particle_idx != other_idx:
             dx = pos_x - positions[other_idx, 0]
             dy = pos_y - positions[other_idx, 1]
             dist_sq = dx * dx + dy * dy
-            collision_dist_sq = (PARTICLE_RADIUS * 2.5) * (PARTICLE_RADIUS * 2.5)
             
-            if dist_sq < collision_dist_sq and dist_sq > 0:
-                dist = math.sqrt(dist_sq)
-                nx = dx / dist
-                ny = dy / dist
-                
-                # Reduce repulsion strength for smoother interactions
-                repulsion_strength = 0.4
-                repulsion_factor = (1.0 - dist/(PARTICLE_RADIUS * 2.5)) * repulsion_strength
-                vel_x += nx * repulsion_factor
-                vel_y += ny * repulsion_factor
-                
-                dvx = vel_x - velocities[other_idx, 0]
-                dvy = vel_y - velocities[other_idx, 1]
-                
-                vn = dvx * nx + dvy * ny
-                
-                if vn > 0:
-                    # Softer collision response
-                    impulse = vn * CUDA_COLLISION_RESPONSE * 0.8
-                    vel_x -= impulse * nx
-                    vel_y -= impulse * ny
+            if dist_sq < MIN_SEPARATION * MIN_SEPARATION:
+                if dist_sq > 0:
+                    dist = math.sqrt(dist_sq)
+                    nx = dx / dist
+                    ny = dy / dist
                     
-                    # Gentler separation
-                    overlap = (PARTICLE_RADIUS * 2.5) - dist
-                    if overlap > 0:
-                        separation_factor = 0.5
-                        pos_x += nx * overlap * separation_factor
-                        pos_y += ny * overlap * separation_factor
+                    # Move particles apart to maintain minimum separation
+                    overlap = MIN_SEPARATION - dist
+                    pos_x += nx * overlap * 0.5
+                    pos_y += ny * overlap * 0.5
+                    
+                    # Set velocities to move particles away from each other
+                    velocities[particle_idx, 0] = nx * abs(velocities[particle_idx, 0])
+                    velocities[particle_idx, 1] = ny * abs(velocities[particle_idx, 1])
+                else:
+                    # If particles are at exactly the same position, move them apart
+                    pos_x += MIN_SEPARATION * 0.5
+                    pos_y += MIN_SEPARATION * 0.5
     
-    # Update final position and velocity
+    # Update position
     positions[particle_idx, 0] = pos_x
     positions[particle_idx, 1] = pos_y
-    velocities[particle_idx, 0] = vel_x
-    velocities[particle_idx, 1] = vel_y
 
 @jit(nopython=True)
 def calculate_particle_density(positions, active_particles, grid_size=32):
@@ -125,6 +111,52 @@ def calculate_electromagnetic_forces(positions, charges, forces):
         forces[idx, 0] = force_x
         forces[idx, 1] = force_y
 
+@cuda.jit
+def handle_collisions_gpu(positions, velocities, radii, active_particles):
+    """Handle collisions between particles using their actual radii"""
+    particle_idx = cuda.grid(1)
+    if particle_idx >= active_particles:
+        return
+
+    pos_x = positions[particle_idx, 0]
+    pos_y = positions[particle_idx, 1]
+    vel_x = velocities[particle_idx, 0]
+    vel_y = velocities[particle_idx, 1]
+    my_radius = radii[particle_idx]
+    
+    # Check collisions with nearby particles
+    for other_idx in range(active_particles):
+        if particle_idx != other_idx:
+            dx = pos_x - positions[other_idx, 0]
+            dy = pos_y - positions[other_idx, 1]
+            dist_sq = dx * dx + dy * dy
+            
+            # Use actual combined radii for collision detection
+            min_dist = my_radius + radii[other_idx]
+            if dist_sq < min_dist * min_dist and dist_sq > 0:
+                dist = math.sqrt(dist_sq)
+                nx = dx / dist
+                ny = dy / dist
+                
+                # Immediate position correction
+                overlap = min_dist - dist
+                pos_x += nx * overlap * 0.5
+                pos_y += ny * overlap * 0.5
+                
+                # Elastic collision
+                other_vel_x = velocities[other_idx, 0]
+                other_vel_y = velocities[other_idx, 1]
+                
+                # Perfect elastic collision
+                vel_x, other_vel_x = other_vel_x, vel_x
+                vel_y, other_vel_y = other_vel_y, vel_y
+    
+    # Update final position and velocity
+    positions[particle_idx, 0] = pos_x
+    positions[particle_idx, 1] = pos_y
+    velocities[particle_idx, 0] = vel_x
+    velocities[particle_idx, 1] = vel_y
+
 class PhysicsHandler:
     def __init__(self):
         self.use_gpu = False
@@ -133,10 +165,8 @@ class PhysicsHandler:
         self.max_substeps = 6
         self.gpu_batch_threshold = 32
         
-        # Pre-allocate arrays for collision detection
-        self.cell_size = PARTICLE_RADIUS * 4
-        self.grid_x = int(SIMULATION_WIDTH / self.cell_size) + 1
-        self.grid_y = int(SIMULATION_HEIGHT / self.cell_size) + 1
+        # Initialize arrays for particle properties
+        self.particle_radii = None
         
         # Initialize CUDA device only when needed
         self._init_gpu()
@@ -166,7 +196,7 @@ class PhysicsHandler:
                 cuda.to_device(dummy_velocities),
                 0.016
             )
-            handle_collisions_gpu[blocks, self.threads_per_block](
+            enforce_minimum_distance_gpu[blocks, self.threads_per_block](
                 cuda.to_device(dummy_positions),
                 cuda.to_device(dummy_velocities),
                 dummy_size
@@ -241,7 +271,7 @@ class PhysicsHandler:
                 self._update_cpu(system, dt)
 
     def _update_gpu(self, system, dt):
-        """Optimized GPU implementation"""
+        """Optimized GPU implementation using actual particle radii"""
         active_slice = slice(system.active_particles)
         
         # Calculate proper grid size
@@ -253,6 +283,16 @@ class PhysicsHandler:
             self._update_cpu(system, dt)
             return
         
+        # Update particle radii array
+        if self.particle_radii is None or len(self.particle_radii) < system.active_particles:
+            # Create array of radii for active particles
+            radii = []
+            for i in range(system.active_particles):
+                chem = system.chemical_properties[i]
+                radii.append(chem.element_data.radius * 20)  # Same scaling as renderer
+            self.particle_radii = np.array(radii, dtype=np.float32)
+            self.radii_gpu = cuda.to_device(self.particle_radii)
+        
         # Reuse GPU memory when possible
         if not hasattr(self, 'positions_gpu') or self.positions_gpu.size != system.positions[active_slice].size:
             self.positions_gpu = cuda.to_device(system.positions[active_slice])
@@ -261,10 +301,15 @@ class PhysicsHandler:
             self.positions_gpu.copy_to_device(system.positions[active_slice])
             self.velocities_gpu.copy_to_device(system.velocities[active_slice])
         
-        # Run simulation steps
+        # Update physics with actual radii
         update_velocities_gpu[blocks, threads_per_block](self.velocities_gpu, dt)
         update_positions_gpu[blocks, threads_per_block](self.positions_gpu, self.velocities_gpu, dt)
-        handle_collisions_gpu[blocks, threads_per_block](self.positions_gpu, self.velocities_gpu, system.active_particles)
+        handle_collisions_gpu[blocks, threads_per_block](
+            self.positions_gpu, 
+            self.velocities_gpu,
+            self.radii_gpu,
+            system.active_particles
+        )
         
         # Copy results back
         self.positions_gpu.copy_to_host(system.positions[active_slice])
@@ -348,10 +393,17 @@ class PhysicsHandler:
         self._handle_collisions_vectorized(system)
 
     def _handle_collisions_vectorized(self, system):
-        """Optimized collision handling with spatial partitioning"""
+        """Handle collisions using actual particle radii"""
         active_slice = slice(system.active_particles)
         positions = system.positions[active_slice]
         velocities = system.velocities[active_slice]
+        
+        # Get actual radii for each particle
+        radii = []
+        for i in range(system.active_particles):
+            chem = system.chemical_properties[i]
+            radii.append(chem.element_data.radius * 20)  # Same scaling as renderer
+        radii = np.array(radii)
         
         # Check all pairs of particles
         for i in range(system.active_particles):
@@ -359,16 +411,16 @@ class PhysicsHandler:
                 diff = positions[i] - positions[j]
                 dist_sq = np.sum(diff * diff)
                 
-                # Reduce collision detection radius
-                collision_radius = PARTICLE_RADIUS * 3.0
-                if dist_sq < (collision_radius) ** 2 and dist_sq > 0:
+                # Use actual combined radii
+                min_dist = radii[i] + radii[j]
+                if dist_sq < min_dist * min_dist and dist_sq > 0:
                     dist = np.sqrt(dist_sq)
-                    self._handle_collision(system, i, j, dist)
-
-    def _handle_collision(self, system, i, j, dist):
-        """Handle collision between two particles"""
-        # Only log if debug mode is enabled
-        if system.debug_mode:
-            elem1 = system.chemical_properties[i].element_data.id
-            elem2 = system.chemical_properties[j].element_data.id
-            print(f"Collision between {elem1} and {elem2} at distance {dist:.2f}")
+                    normal = diff / dist
+                    
+                    # Immediate position correction
+                    overlap = min_dist - dist
+                    positions[i] += normal * overlap * 0.5
+                    positions[j] -= normal * overlap * 0.5
+                    
+                    # Perfect elastic collision
+                    velocities[i], velocities[j] = velocities[j].copy(), velocities[i].copy()
