@@ -36,7 +36,7 @@ class SimulationArea(UIComponent):
         )
         
         if self.simulation.interaction_mode == INTERACTION_MODES['CREATE']:
-            # Only create particles on initial click
+            # Create particles on initial click
             self.simulation.particle_system.create_particle_burst(
                 pos=sim_pos,
                 element_type=self.simulation.selected_element,
@@ -45,12 +45,14 @@ class SimulationArea(UIComponent):
                 speed=2.0
             )
             self.simulation.mouse_down = True
-        else:  # DRAG mode
-            # Convert to simulation coordinates for drag
+            return True
+        elif self.simulation.interaction_mode == INTERACTION_MODES['DRAG']:
+            # Start drag operation
             self.simulation.mouse_down = True
             self.simulation.particle_system.physics.start_drag(
-                self.simulation.particle_system, 
-                sim_pos  # Pass simulation coordinates
+                self.simulation.particle_system,
+                sim_pos
             )
-            
-        return True 
+            return True
+        
+        return False

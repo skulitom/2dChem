@@ -114,3 +114,17 @@ class ParticleRenderer:
         """Check if any part of the bond is visible on screen"""
         return ((-PARTICLE_RADIUS <= max(pos1[0], pos2[0]) <= WINDOW_WIDTH + PARTICLE_RADIUS) and
                 (-PARTICLE_RADIUS <= max(pos1[1], pos2[1]) <= WINDOW_HEIGHT + PARTICLE_RADIUS))
+
+    def _draw_debug_info(self, system, screen):
+        """Draw debug information"""
+        for i in range(system.active_particles):
+            pos = system.positions[i]
+            chem = system.chemical_properties[i]
+            
+            # Draw element symbol
+            text = self.font.render(chem.element_data.id, True, (255, 255, 255))
+            screen.blit(text, (pos[0] - 10, pos[1] - 10))
+            
+            # Draw bond count
+            bond_text = self.font.render(f"{len(chem.bonds)}/{chem.max_bonds}", True, (255, 255, 0))
+            screen.blit(bond_text, (pos[0] - 10, pos[1] + 10))

@@ -11,6 +11,7 @@ from core.constants import (
 from utils.profiler import profile_function
 from physics.chemical_particle import Bond
 from typing import Optional
+from physics.bond_system import BondSystem
 
 class CollisionHandler:
     @staticmethod
@@ -22,99 +23,70 @@ class CollisionHandler:
         distance = np.linalg.norm(pos_diff)
         
         print(f"\n=== Collision Detection ===")
-        print(f"Particles: {current_idx} and {other_idx}")
         print(f"Distance: {distance}")
         
         current_chem = system.chemical_properties[current_idx]
         other_chem = system.chemical_properties[other_idx]
         
-        print(f"Element types: {current_chem.element_data.id} and {other_chem.element_data.id}")
-        print(f"Possible bonds for {current_chem.element_data.id}: {current_chem.element_data.possible_bonds}")
-        print(f"Current bonds: {len(current_chem.bonds)}/{current_chem.max_bonds}")
-        print(f"Other bonds: {len(other_chem.bonds)}/{other_chem.max_bonds}")
+        print(f"Elements: {current_chem.element_data.id} and {other_chem.element_data.id}")
+        print(f"Possible bonds: {current_chem.element_data.possible_bonds}")
+        
+        # Calculate collision energy
+        relative_velocity = np.linalg.norm(system.velocities[current_idx] - system.velocities[other_idx])
+        collision_energy = 0.5 * relative_velocity * relative_velocity
+        
+        print(f"Collision energy: {collision_energy}")
+        print(f"Energy threshold: {ACTIVATION_ENERGY_THRESHOLD}")
         
         # First check if particles are already bonded
-        already_bonded = any(bond.particle_id == other_idx for bond in current_chem.bonds)
+        already_bonded = any(
+            bond.particle_id == other_idx 
+            for bond in current_chem.bonds
+        )
         
         if already_bonded:
-            print("Particles already bonded - handling bonded physics")
             CollisionHandler._handle_bonded_particles(system, current_idx, other_idx)
             return True
-        
-        # Try to form bond if within bonding distance
-        combined_radius = (current_chem.element_data.radius + other_chem.element_data.radius) * 2.0
-        if distance <= combined_radius and current_chem.element_data.possible_bonds.get(other_chem.element_data.id):
-            print("Bond configuration found - attempting bond formation")
-            success = CollisionHandler._try_form_bond(system, current_idx, other_idx, distance)
-            print(f"Bond formation result: {success}")
-            if success:
-                return True
-        else:
-            print("No valid bond configuration found")
+            
+        # Try chemical bonding if energy is appropriate (not too high or low)
+        if ACTIVATION_ENERGY_THRESHOLD * 0.5 <= collision_energy <= ACTIVATION_ENERGY_THRESHOLD * 2.0:
+            # Check if bonding is possible based on distance and element types
+            combined_radius = (current_chem.element_data.radius + other_chem.element_data.radius) * 20.0  # Match display scaling
+            if (distance <= combined_radius * 1.5 and  # Allow some flexibility in bonding distance
+                current_chem.element_data.possible_bonds.get(other_chem.element_data.id)):
+                
+                # Try to form bond
+                if CollisionHandler._try_form_bond(system, current_idx, other_idx, distance):
+                    return True
         
         # If no bond formed, handle regular collision
-        print("Handling regular collision")
         CollisionHandler._handle_regular_collision(system, current_idx, other_idx, pos_diff, distance)
         return False
 
     @staticmethod
     def _try_form_bond(system, idx1, idx2, distance) -> bool:
         """Try to form a bond between two particles"""
-        relative_velocity = np.linalg.norm(system.velocities[idx1] - system.velocities[idx2])
-        if relative_velocity > MAX_REACTION_VELOCITY:
-            print("Particles moving too fast to bond")
+        # Check conditions including angle validity
+        if not BondSystem.check_bond_formation_conditions(system, idx1, idx2, distance):
             return False
-        
-        chem1 = system.chemical_properties[idx1]
-        chem2 = system.chemical_properties[idx2]
-        
-        print(f"\n=== Attempting Bond Formation ===")
-        print(f"Between {chem1.element_data.id} and {chem2.element_data.id}")
-        
-        # Check if particles are already bonded
-        if any(bond.particle_id == idx2 for bond in chem1.bonds):
-            print("Already bonded")
+            
+        if not CollisionHandler._check_bond_angle_validity(system, idx1, idx2):
             return False
-        
-        # Check max bonds
-        if len(chem1.bonds) >= chem1.max_bonds or len(chem2.bonds) >= chem2.max_bonds:
-            print("Max bonds reached")
-            return False
-        
-        # Get bond configuration
-        bond_config = chem1.element_data.possible_bonds.get(chem2.element_data.id)
-        if not bond_config:
-            print("No valid bond configuration")
-            return False
-        
-        print(f"Creating bond with config: {bond_config}")
-        
+
         # Create bonds
-        bond1 = Bond(
-            particle_id=idx2,
-            bond_type=bond_config['type'],
-            strength=bond_config['strength'],
-            shared_electrons=2
-        )
+        bonds = BondSystem.create_bond(system, idx1, idx2)
+        if not bonds:
+            return False
+
+        bond1, bond2 = bonds
         
-        bond2 = Bond(
-            particle_id=idx1,
-            bond_type=bond_config['type'],
-            strength=bond_config['strength'],
-            shared_electrons=2
-        )
-        
-        # Add bonds
-        chem1.bonds.append(bond1)
-        chem2.bonds.append(bond2)
-        
-        print("Bond formed successfully!")
-        
-        # Reduce velocities after bonding
-        avg_velocity = (system.velocities[idx1] + system.velocities[idx2]) * 0.5
-        system.velocities[idx1] = avg_velocity * 0.7
-        system.velocities[idx2] = avg_velocity * 0.7
-        
+        # Add bonds to particles
+        system.chemical_properties[idx1].bonds.append(bond1)
+        system.chemical_properties[idx2].bonds.append(bond2)
+
+        # Apply physical effects
+        BondSystem.apply_bond_effects(system, idx1, idx2)
+
         return True
 
     @staticmethod
@@ -411,7 +383,7 @@ class CollisionHandler:
         # Check existing bonds' angles
         for bond in chem1.bonds:
             angle = system.calculate_bond_angle(idx1, bond.particle_id, idx2)
-            if abs(angle - target_angle) > BOND_ANGLE_TOLERANCE:
+            if angle is not None and abs(angle - target_angle) > BOND_ANGLE_TOLERANCE:
                 return False
                 
         return True

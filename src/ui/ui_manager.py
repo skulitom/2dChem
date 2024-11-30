@@ -41,14 +41,15 @@ class UIManager:
                 mouse_pos = pygame.mouse.get_pos()
                 if self.simulation.interaction_mode == INTERACTION_MODES['DRAG']:
                     # Convert to simulation coordinates for drag
-                    sim_pos = (
-                        mouse_pos[0] - SIMULATION_X_OFFSET,
-                        mouse_pos[1] - SIMULATION_Y_OFFSET
-                    )
-                    self.simulation.particle_system.physics.update_drag(
-                        self.simulation.particle_system, 
-                        sim_pos
-                    )
+                    if mouse_pos[0] >= SIMULATION_X_OFFSET:
+                        sim_pos = (
+                            mouse_pos[0] - SIMULATION_X_OFFSET,
+                            mouse_pos[1] - SIMULATION_Y_OFFSET
+                        )
+                        self.simulation.particle_system.physics.update_drag(
+                            self.simulation.particle_system, 
+                            sim_pos
+                        )
                     
         return False
         

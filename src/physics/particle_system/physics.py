@@ -215,19 +215,19 @@ class PhysicsHandler:
         velocities = system.velocities[active_slice]
         
         # Define boundaries relative to simulation area
-        left_boundary = 0
-        right_boundary = SIMULATION_WIDTH - PARTICLE_RADIUS
-        floor_level = SIMULATION_HEIGHT - FLOOR_BUFFER - PARTICLE_RADIUS
+        left_boundary = PARTICLE_RADIUS * 2  # Add padding
+        right_boundary = SIMULATION_WIDTH - PARTICLE_RADIUS * 4  # Increase right boundary padding
+        floor_level = SIMULATION_HEIGHT - FLOOR_BUFFER - PARTICLE_RADIUS * 4  # Increase floor padding
         
-        # Handle horizontal boundaries
+        # Handle horizontal boundaries with stronger response
         x_left_violation = positions[:, 0] < left_boundary
         x_right_violation = positions[:, 0] > right_boundary
         
-        # Fix positions and reflect velocities
+        # Fix positions and reflect velocities with stronger response
         positions[x_left_violation, 0] = left_boundary
         positions[x_right_violation, 0] = right_boundary
-        velocities[x_left_violation, 0] *= -COLLISION_RESPONSE
-        velocities[x_right_violation, 0] *= -COLLISION_RESPONSE
+        velocities[x_left_violation, 0] *= -COLLISION_RESPONSE * 1.2  # Stronger bounce
+        velocities[x_right_violation, 0] *= -COLLISION_RESPONSE * 1.2
         
         # Handle vertical boundaries (floor)
         y_floor_violation = positions[:, 1] > floor_level
@@ -237,7 +237,7 @@ class PhysicsHandler:
         floor_collision = y_floor_violation & (velocities[:, 1] > 0)
         if np.any(floor_collision):
             velocities[floor_collision, 1] *= -COLLISION_RESPONSE
-            velocities[floor_collision, 0] *= 0.95  # Increased friction
+            velocities[floor_collision, 0] *= 0.95  # Friction
         
         # Stop very slow particles on the floor
         floor_contact = positions[:, 1] >= floor_level - 0.1
@@ -417,6 +417,13 @@ class PhysicsHandler:
         """Optimized CPU implementation with SIMD operations"""
         active_slice = slice(system.active_particles)
         
+        # Clear any invalid particles
+        system.active_mask[active_slice] &= (
+            (system.positions[active_slice, 1] < SIMULATION_HEIGHT) &
+            (system.positions[active_slice, 0] >= 0) &
+            (system.positions[active_slice, 0] < SIMULATION_WIDTH)
+        )
+        
         # Use pre-allocated arrays for better performance
         if not hasattr(self, '_predicted_positions') or self._predicted_positions.shape != system.positions[active_slice].shape:
             self._predicted_positions = np.empty_like(system.positions[active_slice])
@@ -459,7 +466,11 @@ class PhysicsHandler:
         radii = []
         for i in range(system.active_particles):
             chem = system.chemical_properties[i]
-            radii.append(chem.element_data.radius * 20)  # Same scaling as renderer
+            # Scale radius based on element type
+            base_radius = chem.element_data.radius * 20  # Base scaling
+            if chem.element_data.id == 'H':
+                base_radius *= 0.6  # Make hydrogen smaller
+            radii.append(base_radius)
         radii = np.array(radii)
         
         # Check all pairs of particles
@@ -468,19 +479,33 @@ class PhysicsHandler:
                 diff = positions[i] - positions[j]
                 dist_sq = np.sum(diff * diff)
                 
-                # Use actual combined radii
-                min_dist = radii[i] + radii[j]
+                # Use actual combined radii plus a small buffer
+                min_dist = (radii[i] + radii[j]) * 1.1  # Add 10% buffer
                 if dist_sq < min_dist * min_dist and dist_sq > 0:
                     dist = np.sqrt(dist_sq)
                     normal = diff / dist
                     
-                    # Immediate position correction
+                    # Stronger position correction to prevent overlap
                     overlap = min_dist - dist
-                    positions[i] += normal * overlap * 0.5
-                    positions[j] -= normal * overlap * 0.5
+                    positions[i] += normal * overlap * 0.6
+                    positions[j] -= normal * overlap * 0.6
                     
-                    # Perfect elastic collision
-                    velocities[i], velocities[j] = velocities[j].copy(), velocities[i].copy()
+                    # More elastic collision response
+                    rel_vel = velocities[i] - velocities[j]
+                    vel_along_normal = np.dot(rel_vel, normal)
+                    
+                    if vel_along_normal > 0:
+                        # Calculate impulse
+                        restitution = 0.8  # More bouncy
+                        impulse = normal * vel_along_normal * restitution
+                        
+                        # Apply impulse with mass consideration
+                        mass_i = system.chemical_properties[i].element_data.mass
+                        mass_j = system.chemical_properties[j].element_data.mass
+                        total_mass = mass_i + mass_j
+                        
+                        velocities[i] -= impulse * (mass_j / total_mass)
+                        velocities[j] += impulse * (mass_i / total_mass)
 
     @profile_function(threshold_ms=1.0)
     def update_collisions(self, system, delta_time):

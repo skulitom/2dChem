@@ -77,6 +77,8 @@ def handle_collisions_gpu(positions, velocities, active_particles):
     
     # Handle particle collisions
     for j in range(active_particles):
+        if j >= positions.shape[0]:
+            break
         if particle_idx != j:
             dx = pos_shared[tx][0] - positions[j][0]
             dy = pos_shared[tx][1] - positions[j][1]
