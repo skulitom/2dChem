@@ -6,44 +6,40 @@ from pygame import Surface
 from core.constants import (
     WINDOW_WIDTH, WINDOW_HEIGHT,
     BLACK, WHITE, ELEMENT_COLORS,
-    UI_COLORS
+    UI_COLORS, INTERACTION_MODES,
+    SIMULATION_X_OFFSET, SIMULATION_Y_OFFSET
 )
 from physics.particle_system import ParticleSystem
 from utils.profiler import Profiler
+from ui.ui_manager import UIManager
 
 class Simulation:
     def __init__(self):
         pygame.init()
         
-        # UI configuration
+        # Initialize display first
+        self._init_display()
+        
+        # Then UI configuration
         self._init_ui_config()
         
-        # Initialize core components
-        self._init_display()
+        # Initialize remaining components
         self._init_state()
-        self._init_surfaces()
         self.profiler = Profiler()
         self.profiler.start()
-    
-    def _init_ui_config(self):
-        """Initialize UI configuration values"""
-        self.ui_padding = 12
-        self.tab_height = 45
-        self.tab_width = 75
-        self.tab_padding = 3
-        self.sidebar_width = 220
-        self.elements = ['H', 'O', 'N', 'C']
-        self.element_font = pygame.font.Font(None, 32)
-        self.stats_font = pygame.font.Font(None, 26)
-        self.corner_radius = 8
-        self.button_height = 35
+        
+        self.interaction_mode = INTERACTION_MODES['CREATE']  # Default to create mode
     
     def _init_display(self):
         """Initialize display and timing components"""
         self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-        pygame.display.set_caption("Particle System")
+        pygame.display.set_caption("2D Chemistry Simulation")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
+    
+    def _init_ui_config(self):
+        """Initialize UI configuration values"""
+        self.ui_manager = UIManager(self)
     
     def _init_state(self):
         """Initialize simulation state"""
@@ -66,25 +62,31 @@ class Simulation:
         for event in pygame.event.get():
             if event.type == QUIT:
                 return False
-            elif event.type == MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left click
-                    if self._handle_mouse_down(event):
-                        # If clear button was clicked, ensure mouse_down is False
-                        self.mouse_down = False
-                        # Force a redraw
-                        self.draw()
-                        pygame.display.flip()
-                elif event.button == 4:  # Mouse wheel up
+            
+            # Let UI handle events first
+            if self.ui_manager.handle_event(event):
+                continue
+            
+            # Handle remaining simulation events
+            if event.type == MOUSEBUTTONDOWN:
+                if event.button == 4:  # Mouse wheel up
                     self.particles_per_burst = min(100, self.particles_per_burst + 5)
                 elif event.button == 5:  # Mouse wheel down
                     self.particles_per_burst = max(1, self.particles_per_burst - 5)
-            elif event.type == MOUSEBUTTONUP and event.button == 1:
-                self.mouse_down = False
         return True
     
     def _handle_mouse_down(self, event):
         """Handle mouse down event"""
         mouse_pos = pygame.mouse.get_pos()
+        
+        # Check mode switch button
+        if self.mode_button_rect.collidepoint(mouse_pos):
+            self.interaction_mode = (
+                INTERACTION_MODES['DRAG'] 
+                if self.interaction_mode == INTERACTION_MODES['CREATE'] 
+                else INTERACTION_MODES['CREATE']
+            )
+            return True
         
         # Calculate button position the same way as in _draw_sidebar
         y_offset = self.ui_padding * 2 + (40 * 4)  # 4 stats * 40 pixels each
@@ -111,7 +113,10 @@ class Simulation:
         if self._is_in_element_tabs(mouse_pos):
             self._handle_tab_selection(mouse_pos)
         elif self._is_in_simulation_area(mouse_pos):
-            self.mouse_down = True
+            if self.interaction_mode == INTERACTION_MODES['CREATE']:
+                self.mouse_down = True
+            else:  # DRAG mode
+                self.particle_system.physics.start_drag(self.particle_system, mouse_pos)
         
         return False
     
@@ -130,23 +135,36 @@ class Simulation:
         if tab_idx < len(self.elements):
             self.selected_element = self.elements[tab_idx]
     
+    def _handle_mouse_up(self, event):
+        """Handle mouse up event"""
+        self.mouse_down = False
+        self.particle_system.physics.end_drag(self.particle_system)
+    
+    def _handle_mouse_motion(self, event):
+        """Handle mouse motion event"""
+        if self.interaction_mode == INTERACTION_MODES['DRAG']:
+            self.particle_system.physics.update_drag(self.particle_system, event.pos)
+    
     def update(self):
+        """Update simulation state"""
         self.current_delta = self.clock.get_time() / 1000.0
         
-        if self.mouse_down:
+        # Only create particles while mouse is held down
+        if self.mouse_down and self.interaction_mode == INTERACTION_MODES['CREATE']:
             mouse_pos = pygame.mouse.get_pos()
-            # Adjust mouse position relative to simulation area
-            adjusted_pos = (
-                mouse_pos[0] - self.sidebar_width,
-                mouse_pos[1] - self.tab_height
-            )
-            self.particle_system.create_particle_burst(
-                pos=adjusted_pos,
-                element_type=self.selected_element,
-                burst_size=self.particles_per_burst,
-                spread=20.0,
-                speed=2.0
-            )
+            if self.ui_manager.simulation_area.is_point_inside(mouse_pos):  # Only create particles in simulation area
+                # Adjust mouse position relative to simulation area
+                adjusted_pos = (
+                    mouse_pos[0] - SIMULATION_X_OFFSET,
+                    mouse_pos[1] - SIMULATION_Y_OFFSET
+                )
+                self.particle_system.create_particle_burst(
+                    pos=adjusted_pos,
+                    element_type=self.selected_element,
+                    burst_size=self.particles_per_burst,
+                    spread=20.0,
+                    speed=2.0
+                )
         
         self.particle_system.update(self.current_delta)
     
@@ -221,6 +239,13 @@ class Simulation:
                                           UI_COLORS['HIGHLIGHT'] if self.clear_button_rect.collidepoint(pygame.mouse.get_pos()) else UI_COLORS['TEXT'])
         text_rect = clear_text.get_rect(center=self.clear_button_rect.center)
         self.sidebar.blit(clear_text, text_rect)
+        
+        # Draw mode switch button
+        pygame.draw.rect(self.sidebar, UI_COLORS['PANEL'], self.mode_button_rect)
+        mode_text = f"Mode: {'Drag' if self.interaction_mode == INTERACTION_MODES['DRAG'] else 'Create'}"
+        mode_surface = self.font.render(mode_text, True, UI_COLORS['TEXT'])
+        mode_rect = mode_surface.get_rect(center=self.mode_button_rect.center)
+        self.sidebar.blit(mode_surface, mode_rect)
     
     def _draw_element_tabs(self):
         """Draw the element selection tabs with enhanced styling"""
@@ -283,23 +308,8 @@ class Simulation:
             self.element_tabs.blit(text, text_rect)
     
     def draw(self):
-        self.screen.fill(UI_COLORS['BACKGROUND'])
-        
-        # Draw sidebar
-        self._draw_sidebar()
-        self.screen.blit(self.sidebar, (0, 0))
-        
-        # Draw element tabs
-        self._draw_element_tabs()
-        self.screen.blit(self.element_tabs, (self.sidebar_width, 0))
-        
-        # Draw simulation area with subtle border
-        self.simulation_area.fill(UI_COLORS['BACKGROUND'])
-        self.particle_system.draw(self.simulation_area)
-        self.screen.blit(self.simulation_area,
-                        (self.sidebar_width, self.tab_height))
-        
-        pygame.display.flip()
+        """Draw the simulation"""
+        self.ui_manager.draw()
     
     def run(self):
         running = True
@@ -312,6 +322,14 @@ class Simulation:
         self.profiler.stop()  # Stop profiling before exit
         pygame.quit()
         sys.exit()
+    
+    def toggle_interaction_mode(self):
+        """Toggle between CREATE and DRAG interaction modes"""
+        self.interaction_mode = (
+            INTERACTION_MODES['DRAG'] 
+            if self.interaction_mode == INTERACTION_MODES['CREATE'] 
+            else INTERACTION_MODES['CREATE']
+        )
 
 if __name__ == '__main__':
     simulation = Simulation()

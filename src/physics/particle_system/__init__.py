@@ -10,10 +10,12 @@ class ParticleSystem(ParticleSystemCore):
         self.collision = CollisionHandler()
         self.renderer = ParticleRenderer()
         self.debug_mode = False
+        self.time = 0.0
 
     def update(self, delta_time):
         if self.active_particles > 0:
             self.physics.update(self, delta_time)
+            self.time += delta_time
 
     def draw(self, screen):
         self.renderer.draw(self, screen) 

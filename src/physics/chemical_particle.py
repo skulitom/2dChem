@@ -146,29 +146,29 @@ class ChemicalParticle:
         return False
 
     def can_bond_with(self, other: 'ChemicalParticle', distance: float) -> bool:
-        """Check if bonding is possible between two particles"""
-        # Check if elements can bond with each other
+        """Check if this particle can form a bond with another"""
+        print(f"\n=== Bond Check ===")
+        print(f"Self element: {self.element_data.id}")
+        print(f"Other element: {other.element_data.id}")
+        print(f"Current bonds: {len(self.bonds)}")
+        print(f"Max bonds: {self.max_bonds}")
+        
+        # Check if we have room for more bonds
+        if len(self.bonds) >= self.max_bonds:
+            print("Maximum bonds reached")
+            return False
+        
+        # Check if the other element is in our possible bonds
         if other.element_data.id not in self.element_data.possible_bonds:
+            print("No possible bond configuration")
             return False
         
-        if self.element_data.id not in other.element_data.possible_bonds:
+        # Check if we're already bonded
+        if any(bond.particle_id == other.particle_id for bond in self.bonds):
+            print("Already bonded")
             return False
-
-        # Check max bonds
-        if len(self.bonds) >= 3 or len(other.bonds) >= 3:
-            return False
-
-        # Calculate exact bonding distance based on radii (scaled to match display)
-        combined_radius = (self.element_data.radius + other.element_data.radius) * 20  # Match display scaling
         
-        # In 2D, particles should touch exactly at their edges for bonding
-        # Allow only a very small tolerance for numerical stability
-        min_dist = combined_radius * 0.95  # 5% tolerance below
-        max_dist = combined_radius * 1.05  # 5% tolerance above
-        
-        if not (min_dist <= distance <= max_dist):
-            return False
-
+        print("Can bond: True")
         return True
         
     def _check_2d_geometry_constraints(self, other: 'ChemicalParticle') -> bool:
@@ -398,6 +398,8 @@ class ChemicalParticle:
             if bond.particle_id == other_particle_id:
                 # Return electrons when breaking bond
                 self.bonding_electrons -= bond.shared_electrons // 2
+                # Update valence electrons
+                self.valence_electrons += bond.shared_electrons // 2
                 self.bonds.pop(i)
                 return True
         return False

@@ -44,6 +44,9 @@ def update_velocities_gpu(velocities, dt):
 
 @cuda.jit
 def handle_collisions_gpu(positions, velocities, active_particles):
+    # Add synchronization to prevent race conditions
+    cuda.syncthreads()  # Synchronize before processing
+    
     particle_idx = cuda.grid(1)
     if particle_idx >= active_particles:
         return
@@ -97,5 +100,7 @@ def handle_collisions_gpu(positions, velocities, active_particles):
                     vel_shared[tx][0] -= impulse * nx
                     vel_shared[tx][1] -= impulse * ny
     
+    # Ensure all threads complete before writing back
+    cuda.syncthreads()
     # Write back to global memory
     velocities[particle_idx] = vel_shared[tx]

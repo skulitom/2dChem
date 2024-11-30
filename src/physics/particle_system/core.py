@@ -84,10 +84,15 @@ class ParticleSystemCore:
 
     def clear_particles(self):
         """Clear all particles from the system."""
+        # Before clearing arrays, break all bonds to prevent memory leaks
+        for idx in range(self.active_particles):
+            if idx in self.chemical_properties:
+                self.chemical_properties[idx].break_all_bonds()
+        
         self.active_particles = 0
         self.active_mask.fill(False)
         self.chemical_properties.clear()
-        # Reset arrays to ensure complete cleanup
+        # Reset arrays
         self.positions.fill(0)
         self.velocities.fill(0)
         self.element_types.fill('')

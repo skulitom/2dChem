@@ -5,7 +5,7 @@ from core.constants import (
     GRAVITY, WINDOW_HEIGHT, WINDOW_WIDTH, COLLISION_RESPONSE, 
     FIXED_TIMESTEP, MAX_VELOCITY, PARTICLE_RADIUS, FLOOR_BUFFER, MIN_BOUNCE_VELOCITY,
     SIMULATION_HEIGHT, SIMULATION_WIDTH, SIMULATION_Y_OFFSET, SIMULATION_X_OFFSET,
-    ELECTROMAGNETIC_CONSTANT
+    ELECTROMAGNETIC_CONSTANT, DRAG_FORCE_MULTIPLIER
 )
 from utils.profiler import profile_function
 
@@ -164,6 +164,9 @@ class PhysicsHandler:
         self.min_substeps = 2
         self.max_substeps = 6
         self.gpu_batch_threshold = 32
+        self.dragged_particle = None
+        self.drag_offset = None
+        self.drag_force_multiplier = 5.0  # Increased for more responsive dragging
         
         # Initialize arrays for particle properties
         self.particle_radii = None
@@ -243,12 +246,66 @@ class PhysicsHandler:
         velocities[stop_mask, 1] = 0
         positions[stop_mask, 1] = floor_level
     
+    def start_drag(self, system, pos):
+        """Start dragging a particle"""
+        # Convert pos to numpy array for vector operations
+        pos = np.array(pos, dtype=np.float32)
+        
+        # Find closest particle to drag point
+        closest_dist = float('inf')
+        closest_idx = None
+        
+        for i in range(system.active_particles):
+            if not system.active_mask[i]:
+                continue
+                
+            dist = np.linalg.norm(system.positions[i] - pos)
+            if dist < closest_dist and dist < 20:  # Within 20 pixels
+                closest_dist = dist
+                closest_idx = i
+        
+        if closest_idx is not None:
+            self.dragged_particle = closest_idx
+            # Store the exact offset from click point to particle position
+            self.drag_offset = system.positions[closest_idx] - pos
+
+    def update_drag(self, system, pos):
+        """Update dragged particle position"""
+        if self.dragged_particle is None:
+            return
+
+        # Convert pos to numpy array
+        pos = np.array(pos, dtype=np.float32)
+        
+        # Update position directly to mouse position plus original offset
+        if self.drag_offset is not None:
+            system.positions[self.dragged_particle] = pos + self.drag_offset
+            # Zero out velocity while dragging
+            system.velocities[self.dragged_particle] = np.zeros(2)
+
+    def end_drag(self, system):
+        """End particle dragging"""
+        if self.dragged_particle is not None:
+            # Zero out velocity when releasing
+            system.velocities[self.dragged_particle] = np.zeros(2)
+            self.dragged_particle = None
+            self.drag_offset = None
+
     @profile_function(threshold_ms=1.0)
     def update(self, system, delta_time):
         """Update the physics simulation"""
         if system.active_particles == 0:
             return
             
+        # Handle dragged particle separately
+        if self.dragged_particle is not None:
+            # Skip physics update for dragged particle
+            mask = np.ones(system.active_particles, dtype=bool)
+            mask[self.dragged_particle] = False
+            active_slice = mask
+        else:
+            active_slice = slice(system.active_particles)
+
         # Use simpler physics for small particle counts
         if system.active_particles < self.gpu_batch_threshold:
             self._update_cpu_simple(system, delta_time)
@@ -424,3 +481,26 @@ class PhysicsHandler:
                     
                     # Perfect elastic collision
                     velocities[i], velocities[j] = velocities[j].copy(), velocities[i].copy()
+
+    @profile_function(threshold_ms=1.0)
+    def update_collisions(self, system, delta_time):
+        """Update particle collisions"""
+        for i in range(system.active_particles):
+            for j in range(i + 1, system.active_particles):
+                # Calculate distance between particles
+                pos_diff = system.positions[i] - system.positions[j]
+                distance = np.linalg.norm(pos_diff)
+                
+                # Get combined radius for collision check
+                radius_i = system.chemical_properties[i].element_data.radius
+                radius_j = system.chemical_properties[j].element_data.radius
+                combined_radius = (radius_i + radius_j) * 20  # Scale to match display
+                
+                print(f"\n=== Checking collision between particles {i} and {j} ===")
+                print(f"Distance: {distance}")
+                print(f"Combined radius: {combined_radius}")
+                
+                # Check for collision
+                if distance < combined_radius * 2.0:  # More lenient collision detection
+                    print("Collision detected!")
+                    CollisionHandler.handle_particle_collision(system, i, j)
