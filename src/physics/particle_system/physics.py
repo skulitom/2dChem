@@ -48,16 +48,16 @@ def handle_collisions_gpu(positions, velocities, active_particles):
             dx = pos_x - positions[other_idx, 0]
             dy = pos_y - positions[other_idx, 1]
             dist_sq = dx * dx + dy * dy
-            collision_dist_sq = (PARTICLE_RADIUS * 4.0) * (PARTICLE_RADIUS * 4.0)
+            collision_dist_sq = (PARTICLE_RADIUS * 2.5) * (PARTICLE_RADIUS * 2.5)
             
             if dist_sq < collision_dist_sq and dist_sq > 0:
                 dist = math.sqrt(dist_sq)
                 nx = dx / dist
                 ny = dy / dist
                 
-                # Add repulsion force
-                repulsion_strength = 0.8
-                repulsion_factor = (1.0 - dist/(PARTICLE_RADIUS * 4.0)) * repulsion_strength
+                # Reduce repulsion strength for smoother interactions
+                repulsion_strength = 0.4
+                repulsion_factor = (1.0 - dist/(PARTICLE_RADIUS * 2.5)) * repulsion_strength
                 vel_x += nx * repulsion_factor
                 vel_y += ny * repulsion_factor
                 
@@ -67,15 +67,15 @@ def handle_collisions_gpu(positions, velocities, active_particles):
                 vn = dvx * nx + dvy * ny
                 
                 if vn > 0:
-                    # Stronger collision response
-                    impulse = vn * CUDA_COLLISION_RESPONSE * 1.5
+                    # Softer collision response
+                    impulse = vn * CUDA_COLLISION_RESPONSE * 0.8
                     vel_x -= impulse * nx
                     vel_y -= impulse * ny
                     
-                    # More aggressive separation
-                    overlap = (PARTICLE_RADIUS * 4.0) - dist
+                    # Gentler separation
+                    overlap = (PARTICLE_RADIUS * 2.5) - dist
                     if overlap > 0:
-                        separation_factor = 0.9  # Increased from 0.7
+                        separation_factor = 0.5
                         pos_x += nx * overlap * separation_factor
                         pos_y += ny * overlap * separation_factor
     
@@ -353,14 +353,14 @@ class PhysicsHandler:
         positions = system.positions[active_slice]
         velocities = system.velocities[active_slice]
         
-        # Check all pairs of particles (temporary solution for debugging)
+        # Check all pairs of particles
         for i in range(system.active_particles):
             for j in range(i + 1, system.active_particles):
                 diff = positions[i] - positions[j]
                 dist_sq = np.sum(diff * diff)
                 
-                # Increase collision detection radius for testing
-                collision_radius = PARTICLE_RADIUS * 12.0
+                # Reduce collision detection radius
+                collision_radius = PARTICLE_RADIUS * 3.0
                 if dist_sq < (collision_radius) ** 2 and dist_sq > 0:
                     dist = np.sqrt(dist_sq)
                     self._handle_collision(system, i, j, dist)

@@ -158,9 +158,9 @@ class ChemicalParticle:
         if len(self.bonds) >= 3 or len(other.bonds) >= 3:
             return False
 
-        # Adjusted distance check to match collision detection
-        min_dist = (self.element_data.radius + other.element_data.radius) * 0.8
-        max_dist = (self.element_data.radius + other.element_data.radius) * 2.5
+        # More lenient distance check
+        min_dist = (self.element_data.radius + other.element_data.radius) * 0.9
+        max_dist = (self.element_data.radius + other.element_data.radius) * 3.0  # Increased from 2.5
         
         if not (min_dist <= distance <= max_dist):
             return False
