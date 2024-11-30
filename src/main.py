@@ -27,16 +27,16 @@ class Simulation:
     
     def _init_ui_config(self):
         """Initialize UI configuration values"""
-        self.ui_padding = 10
-        self.tab_height = 40
-        self.tab_width = 70
-        self.tab_padding = 2
-        self.sidebar_width = 200
+        self.ui_padding = 12
+        self.tab_height = 45
+        self.tab_width = 75
+        self.tab_padding = 3
+        self.sidebar_width = 220
         self.elements = ['H', 'O', 'N', 'C']
-        self.element_font = pygame.font.Font(None, 28)
-        self.stats_font = pygame.font.Font(None, 24)
-        self.corner_radius = 5
-        self.button_height = 30
+        self.element_font = pygame.font.Font(None, 32)
+        self.stats_font = pygame.font.Font(None, 26)
+        self.corner_radius = 8
+        self.button_height = 35
     
     def _init_display(self):
         """Initialize display and timing components"""
@@ -124,19 +124,26 @@ class Simulation:
                 mouse_pos[1] - self.tab_height
             )
             self.particle_system.create_particle_burst(
-                adjusted_pos,
-                self.current_delta,
-                self.selected_element,
-                self.particles_per_burst
+                pos=adjusted_pos,
+                element_type=self.selected_element,
+                burst_size=self.particles_per_burst,
+                spread=20.0,
+                speed=2.0
             )
         
         self.particle_system.update(self.current_delta)
     
     def _draw_sidebar(self):
         """Draw the sidebar with stats and info"""
-        self.sidebar.fill(UI_COLORS['PANEL'])
+        # Draw main panel with gradient
+        gradient_rect = pygame.Surface((self.sidebar_width, WINDOW_HEIGHT), pygame.SRCALPHA)
+        for i in range(WINDOW_HEIGHT):
+            alpha = min(240, 180 + i // 4)  # Subtle vertical gradient
+            color = (*UI_COLORS['PANEL'], alpha)
+            pygame.draw.line(gradient_rect, color, (0, i), (self.sidebar_width, i))
+        self.sidebar.blit(gradient_rect, (0, 0))
         
-        # Draw stats
+        # Draw stats with enhanced styling
         y_offset = self.ui_padding * 2
         stats = [
             f'FPS: {int(self.clock.get_fps())}',
@@ -146,13 +153,29 @@ class Simulation:
         ]
         
         for stat in stats:
+            # Draw stat background with subtle gradient
+            stat_rect = pygame.Rect(
+                self.ui_padding - 4,
+                y_offset - 4,
+                self.sidebar_width - (self.ui_padding * 2) + 8,
+                30
+            )
+            
+            # Gradient background for stats
+            gradient_surface = pygame.Surface(stat_rect.size, pygame.SRCALPHA)
+            for i in range(stat_rect.height):
+                alpha = 150 - (i // 2)
+                pygame.draw.line(gradient_surface, (*UI_COLORS['PANEL'], alpha),
+                               (0, i), (stat_rect.width, i))
+            self.sidebar.blit(gradient_surface, stat_rect)
+            
+            # Clean text rendering without glow
             text = self.stats_font.render(stat, True, UI_COLORS['TEXT'])
-            shadow = self.stats_font.render(stat, True, (0, 0, 0))
-            self.sidebar.blit(shadow, (self.ui_padding + 1, y_offset + 1))
             self.sidebar.blit(text, (self.ui_padding, y_offset))
-            y_offset += 35
-        
-        # Add Clear button
+            
+            y_offset += 40
+
+        # Draw Clear button with refined styling
         button_rect = pygame.Rect(
             self.ui_padding,
             y_offset + 10,
@@ -160,34 +183,41 @@ class Simulation:
             self.button_height
         )
         
-        # Check if mouse is hovering over button
         mouse_pos = pygame.mouse.get_pos()
-        adjusted_pos = (mouse_pos[0], mouse_pos[1])
-        button_hovered = button_rect.collidepoint(adjusted_pos)
+        button_hovered = button_rect.collidepoint(mouse_pos)
         
-        # Draw button with hover effect
-        button_color = UI_COLORS['TAB_HOVER'] if button_hovered else UI_COLORS['PANEL']
-        pygame.draw.rect(self.sidebar, button_color, button_rect, border_radius=self.corner_radius)
-        pygame.draw.rect(self.sidebar, UI_COLORS['BORDER'], button_rect, 1, border_radius=self.corner_radius)
+        # Smoother button gradient
+        gradient_surface = pygame.Surface(button_rect.size, pygame.SRCALPHA)
+        height = button_rect.height
+        for i in range(height):
+            progress = i / height
+            alpha = int(255 * (1 - progress * 0.2))  # Subtler gradient
+            color = UI_COLORS['TAB_HOVER'] if button_hovered else UI_COLORS['PANEL']
+            color = (*color, alpha)
+            pygame.draw.line(gradient_surface, color, 
+                            (0, i), (button_rect.width, i))
         
-        # Draw button text
-        clear_text = self.stats_font.render("Clear Particles", True, UI_COLORS['TEXT'])
+        # Apply gradient and border
+        self.sidebar.blit(gradient_surface, button_rect)
+        pygame.draw.rect(self.sidebar, UI_COLORS['BORDER'], button_rect, 1,
+                        border_radius=self.corner_radius)
+        
+        # Clean button text rendering
+        clear_text = self.stats_font.render("Clear Particles", True, 
+                                          UI_COLORS['HIGHLIGHT'] if button_hovered else UI_COLORS['TEXT'])
         text_rect = clear_text.get_rect(center=button_rect.center)
         self.sidebar.blit(clear_text, text_rect)
-        
-        # Draw a subtle gradient border
-        for i in range(2):
-            color = (UI_COLORS['BORDER'][0], 
-                    UI_COLORS['BORDER'][1],
-                    UI_COLORS['BORDER'][2],
-                    150 - i * 50)
-            pygame.draw.line(self.sidebar, color,
-                            (self.sidebar_width - i, 0),
-                            (self.sidebar_width - i, WINDOW_HEIGHT))
     
     def _draw_element_tabs(self):
-        """Draw the element selection tabs"""
-        self.element_tabs.fill(UI_COLORS['PANEL'])
+        """Draw the element selection tabs with enhanced styling"""
+        # Draw tab panel background with gradient
+        gradient_rect = pygame.Surface((WINDOW_WIDTH - self.sidebar_width, self.tab_height), pygame.SRCALPHA)
+        for i in range(self.tab_height):
+            alpha = min(240, 180 + i // 2)
+            color = (*UI_COLORS['PANEL'], alpha)
+            pygame.draw.line(gradient_rect, color,
+                            (0, i), (WINDOW_WIDTH - self.sidebar_width, i))
+        self.element_tabs.blit(gradient_rect, (0, 0))
         
         mouse_pos = pygame.mouse.get_pos()
         adjusted_mouse_x = mouse_pos[0] - self.sidebar_width
@@ -196,51 +226,47 @@ class Simulation:
             x = i * (self.tab_width + self.tab_padding)
             tab_rect = pygame.Rect(x, 2, self.tab_width, self.tab_height - 4)
             
-            # Determine tab state and colors
+            # Determine tab state
             is_selected = element == self.selected_element
             is_hovered = (tab_rect.collidepoint(adjusted_mouse_x, mouse_pos[1]) and 
                          mouse_pos[1] < self.tab_height)
             
-            if is_selected:
-                bg_color = ELEMENT_COLORS[element]
-                text_color = UI_COLORS['PANEL']
-            elif is_hovered:
-                bg_color = UI_COLORS['TAB_HOVER']
-                text_color = ELEMENT_COLORS[element]
-            else:
-                bg_color = UI_COLORS['PANEL']
-                text_color = ELEMENT_COLORS[element]
+            # Refined tab gradient
+            gradient_surface = pygame.Surface(tab_rect.size, pygame.SRCALPHA)
+            height = tab_rect.height
+            for y in range(height):
+                progress = y / height
+                alpha = int(255 * (1 - progress * 0.3))  # Subtler gradient
+                
+                if is_selected:
+                    color = (*ELEMENT_COLORS[element], alpha)
+                elif is_hovered:
+                    color = (*UI_COLORS['TAB_HOVER'], alpha)
+                else:
+                    color = (*UI_COLORS['PANEL'], alpha)
+                    
+                pygame.draw.line(gradient_surface, color,
+                               (0, y), (tab_rect.width, y))
             
-            # Draw rounded tab background
-            pygame.draw.rect(self.element_tabs, bg_color, tab_rect, 
-                            border_radius=self.corner_radius)
+            # Apply gradient
+            self.element_tabs.blit(gradient_surface, tab_rect)
             
+            # Draw tab border for non-selected tabs
             if not is_selected:
-                # Draw subtle border for unselected tabs
-                pygame.draw.rect(self.element_tabs, UI_COLORS['BORDER'], tab_rect, 
-                               1, border_radius=self.corner_radius)
+                pygame.draw.rect(self.element_tabs, UI_COLORS['BORDER'],
+                               tab_rect, 1, border_radius=self.corner_radius)
             
-            # Draw element symbol
+            # Clean text rendering for element symbols
+            if is_selected:
+                text_color = UI_COLORS['TEXT']
+            elif is_hovered:
+                text_color = (*UI_COLORS['TEXT'], 220)  # Slightly dimmed on hover
+            else:
+                text_color = ELEMENT_COLORS[element]
+                
             text = self.element_font.render(element, True, text_color)
             text_rect = text.get_rect(center=(x + self.tab_width/2, self.tab_height/2))
-            
-            # Add subtle glow effect for selected tab
-            if is_selected:
-                glow = self.element_font.render(element, True, (255, 255, 255, 128))
-                glow_rect = glow.get_rect(center=text_rect.center)
-                self.element_tabs.blit(glow, (glow_rect.x + 1, glow_rect.y + 1))
-            
             self.element_tabs.blit(text, text_rect)
-        
-        # Draw bottom border with gradient
-        for i in range(2):
-            color = (UI_COLORS['BORDER'][0],
-                    UI_COLORS['BORDER'][1],
-                    UI_COLORS['BORDER'][2],
-                    150 - i * 50)
-            pygame.draw.line(self.element_tabs, color,
-                            (0, self.tab_height - i - 1),
-                            (WINDOW_WIDTH - self.sidebar_width, self.tab_height - i - 1))
     
     def draw(self):
         self.screen.fill(UI_COLORS['BACKGROUND'])

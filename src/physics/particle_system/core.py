@@ -2,7 +2,8 @@ import numpy as np
 from core.constants import (
     WINDOW_WIDTH, WINDOW_HEIGHT,
     PARTICLE_SPREAD, VELOCITY_SCALE,
-    SIMULATION_WIDTH, SIMULATION_HEIGHT
+    SIMULATION_WIDTH, SIMULATION_HEIGHT,
+    SIMULATION_X_OFFSET, SIMULATION_Y_OFFSET
 )
 from physics.chemical_particle import ChemicalParticle
 from utils.profiler import profile_function
@@ -69,11 +70,78 @@ class ParticleSystemCore:
         self.active_particles += new_count
 
         # Initialize chemical properties for new particles
+        print(f"\n=== Creating Particle Burst ===")
+        print(f"Start position: {pos}")
+        print(f"Element type: {element_type}")
+        print(f"Burst size: {new_count}")
+        
         for i in range(start_idx, end_idx):
+            print(f"Particle {i} position: {self.positions[i]}")
             self.chemical_properties[i] = ChemicalParticle(element_type, i)
+            print(f"Created particle {i} of type {element_type}")
+            print(f"Valence electrons: {self.chemical_properties[i].valence_electrons}")
+            print(f"Possible bonds: {self.chemical_properties[i].element_data.possible_bonds}")
 
     def clear_particles(self):
         """Clear all particles from the system."""
         self.active_particles = 0
         self.active_mask.fill(False)
         self.chemical_properties.clear()
+
+    def create_particle(self, position, element_type):
+        """Create a new particle"""
+        if self.active_particles >= self.max_particles:
+            return None
+        
+        print(f"create_particle called with element_type: {element_type}")
+        
+        # Validate element_type more strictly
+        valid_elements = ['H', 'O', 'N', 'C']
+        if not isinstance(element_type, str):
+            print(f"Warning: element_type is not a string: {type(element_type)}")
+            element_type = 'H'
+        elif element_type not in valid_elements:
+            print(f"Warning: Invalid element type '{element_type}', valid types are {valid_elements}")
+            element_type = 'H'
+        
+        idx = self.active_particles
+        self.positions[idx] = position
+        self.velocities[idx] = np.zeros(2)
+        self.chemical_properties[idx] = ChemicalParticle(element_type, idx)
+        self.element_types[idx] = element_type  # Make sure we're setting this
+        self.active_mask[idx] = True
+        self.active_particles += 1
+        
+        print(f"Created particle {idx} of type {element_type}")
+        return idx
+
+    def create_particle_burst(self, pos, element_type='H', burst_size=10, spread=20.0, speed=2.0):
+        """Create a burst of particles at a given position."""
+        # Validate element_type
+        valid_elements = ['H', 'O', 'N', 'C']
+        if not isinstance(element_type, str) or element_type not in valid_elements:
+            element_type = 'H'
+        
+        try:
+            burst_size = int(burst_size)
+        except (ValueError, TypeError):
+            burst_size = 10
+
+        if self.active_particles + burst_size > self.max_particles:
+            burst_size = self.max_particles - self.active_particles
+            if burst_size <= 0:
+                return
+
+        # Generate random offsets and velocities
+        for i in range(burst_size):
+            offset = np.random.uniform(-spread, spread, 2)
+            new_pos = np.array(pos) + offset
+            
+            # Clip positions to window boundaries with simulation offsets
+            new_pos[0] = np.clip(new_pos[0], SIMULATION_X_OFFSET, SIMULATION_WIDTH - 1)
+            new_pos[1] = np.clip(new_pos[1], SIMULATION_Y_OFFSET, SIMULATION_HEIGHT - 1)
+            
+            # Create particle
+            idx = self.create_particle(new_pos, element_type)
+            if idx is not None:
+                self.velocities[idx] = np.random.uniform(-speed, speed, 2)

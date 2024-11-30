@@ -12,12 +12,12 @@ GRID_WIDTH = WINDOW_WIDTH // CELL_SIZE
 GRID_HEIGHT = WINDOW_HEIGHT // CELL_SIZE
 
 # Particle Settings
-PARTICLE_RADIUS = 3
+PARTICLE_RADIUS = 4
 COLLISION_DAMPING = 0.5
-GRAVITY = np.float32(4.0)
+GRAVITY = np.float32(9.8)
 PARTICLES_PER_FRAME = 1
 PARTICLE_SPREAD = 8
-COLLISION_RESPONSE = 0.3
+COLLISION_RESPONSE = 0.7
 MIN_PARTICLES = 1
 MAX_PARTICLES = 20
 
@@ -26,7 +26,7 @@ BLACK = Color(0, 0, 0)
 WHITE = Color(255, 255, 255)
 
 # Physics Settings
-FIXED_TIMESTEP = 1/10
+FIXED_TIMESTEP = 1/60
 MAX_STEPS_PER_FRAME = 1
 VELOCITY_SCALE = 5.0
 
@@ -38,19 +38,32 @@ AMBIENT_TEMPERATURE = 298.15
 
 # Update element colors
 ELEMENT_COLORS = {
-    'H': Color(255, 255, 255),  # White
-    'O': Color(255, 0, 0),      # Red
-    'N': Color(0, 0, 255),      # Blue
-    'C': Color(128, 128, 128),  # Gray
-    'He': Color(255, 255, 128), # Light yellow
-    'Li': Color(204, 128, 255), # Light purple
-    # Add more elements as needed
+    'H': (200, 200, 220),    # Softer hydrogen
+    'O': (235, 80, 80),      # Rich red
+    'N': (90, 130, 245),     # Vibrant blue
+    'C': (75, 75, 90),       # Refined carbon
+    'He': (255, 255, 128), # Light yellow for Helium
+    'Li': (204, 128, 255), # Light purple for Lithium
+    'Na': (255, 128, 0),   # Orange for Sodium
+    'Cl': (0, 255, 0),     # Green for Chlorine
+    'F': (255, 255, 0),    # Yellow for Fluorine
+    'P': (255, 128, 128),  # Pink for Phosphorus
+    'S': (255, 255, 0),    # Yellow for Sulfur
+    'K': (163, 0, 163),    # Purple for Potassium
+    'Ca': (128, 128, 0),   # Olive for Calcium
+    'Fe': (128, 0, 0),     # Dark red for Iron
+    'Cu': (255, 128, 0),   # Orange for Copper
+    'Zn': (128, 128, 128), # Gray for Zinc
+    'Ag': (192, 192, 192), # Silver for Silver
+    'Au': (255, 215, 0),   # Gold for Gold
+    'Hg': (190, 190, 190), # Light gray for Mercury
+    'Pb': (128, 128, 128)  # Gray for Lead
 }
 
 # Add new physics constants
 BOND_ENERGY_SCALE = 0.5
 TEMPERATURE_VISUALIZATION_SCALE = 1000.0
-ACTIVATION_ENERGY_THRESHOLD = 100.0
+ACTIVATION_ENERGY_THRESHOLD = 0.1
 
 # Reaction constants
 COLLISION_ANGLE_TOLERANCE = 30.0
@@ -64,15 +77,15 @@ REACTION_PARTICLES = {
     'CATALYST': (0, 255, 255),  # Cyan sparkles for catalysis
 }
 
-# Add new UI color constants
+# Update UI colors for better contrast and cleaner look
 UI_COLORS = {
-    'BACKGROUND': (15, 15, 20),  # Dark blue-black
-    'PANEL': (30, 30, 40),       # Slightly lighter panel background
-    'TEXT': (220, 220, 220),     # Soft white
-    'HIGHLIGHT': (65, 105, 225),  # Royal blue
-    'BORDER': (60, 60, 80),      # Subtle border color
-    'TAB_ACTIVE': (80, 80, 100), # Active tab background
-    'TAB_HOVER': (50, 50, 65),   # Tab hover state
+    'BACKGROUND': (10, 10, 15),       # Darker background
+    'PANEL': (22, 22, 30),           # Slightly darker panel
+    'TEXT': (220, 220, 235),         # Softer white
+    'HIGHLIGHT': (100, 140, 255),    # Brighter blue highlight
+    'BORDER': (40, 40, 55),          # Slightly darker border
+    'TAB_ACTIVE': (75, 75, 95),      # Slightly darker active tab
+    'TAB_HOVER': (32, 32, 45),       # Refined hover state
 }
 
 # Simulation Frame Offsets
@@ -82,9 +95,9 @@ SIMULATION_WIDTH = WINDOW_WIDTH - SIMULATION_X_OFFSET
 SIMULATION_HEIGHT = WINDOW_HEIGHT - SIMULATION_Y_OFFSET
 
 # Add or update these constants
-MAX_VELOCITY = 20.0
-FLOOR_BUFFER = 4
-MIN_BOUNCE_VELOCITY = 0.5
+MAX_VELOCITY = 30.0
+FLOOR_BUFFER = 20
+MIN_BOUNCE_VELOCITY = 0.1
 
 # 2D Physics Constants
 ELECTROMAGNETIC_CONSTANT = 1.0  # Adjusted for 2D
@@ -117,3 +130,16 @@ MAX_REACTION_VELOCITY = 5.0
 ACTIVATION_ENERGY_SCALE = 0.1
 TEMPERATURE_SCALE = 0.01
 BOND_ENERGY_SCALE = 0.5
+ACTIVATION_ENERGY_THRESHOLD = 0.1
+
+# Debug settings
+DEBUG_MODE = True
+DEBUG_SHOW_BONDS = True
+DEBUG_SHOW_BOND_COUNT = True
+DEBUG_COLLISION_RADIUS = PARTICLE_RADIUS * 4.0
+
+print("\n=== Window Configuration ===")
+print(f"Window dimensions: {WINDOW_WIDTH}x{WINDOW_HEIGHT}")
+print(f"Simulation area: {SIMULATION_WIDTH}x{SIMULATION_HEIGHT}")
+print(f"Particle radius: {PARTICLE_RADIUS}")
+print(f"Offsets: X={SIMULATION_X_OFFSET}, Y={SIMULATION_Y_OFFSET}")

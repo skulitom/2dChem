@@ -9,6 +9,7 @@ class ParticleSystem(ParticleSystemCore):
         self.physics = PhysicsHandler()
         self.collision = CollisionHandler()
         self.renderer = ParticleRenderer()
+        self.debug_mode = False
 
     def update(self, delta_time):
         if self.active_particles > 0:

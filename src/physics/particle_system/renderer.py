@@ -1,83 +1,94 @@
 import pygame
 import numpy as np
-from core.constants import WINDOW_WIDTH, WINDOW_HEIGHT, ELEMENT_COLORS
+from core.constants import (
+    WINDOW_WIDTH, WINDOW_HEIGHT, 
+    PARTICLE_RADIUS, ELEMENT_COLORS
+)
 from utils.profiler import profile_function
 
 class ParticleRenderer:
+    def __init__(self):
+        # Pre-create surfaces with hardware acceleration and double buffering
+        flags = pygame.SRCALPHA | pygame.HWSURFACE | pygame.DOUBLEBUF
+        self.particle_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), flags).convert_alpha()
+        self.bond_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), flags).convert_alpha()
+        
+        # Create element surface cache with hardware acceleration
+        self.element_surface_cache = {}
+        print("\nInitializing element surfaces:")
+        for element, color in ELEMENT_COLORS.items():
+            print(f"Creating surface for {element} with color {color}")
+            surf = pygame.Surface((PARTICLE_RADIUS * 2, PARTICLE_RADIUS * 2), pygame.SRCALPHA | pygame.HWSURFACE)
+            pygame.draw.circle(surf, color, (PARTICLE_RADIUS, PARTICLE_RADIUS), PARTICLE_RADIUS)
+            self.element_surface_cache[element] = surf.convert_alpha()
+
     @profile_function(threshold_ms=1.0)
     def draw(self, system, screen):
+        """Draw all active particles and their bonds"""
         if system.active_particles == 0:
             return
         
-        positions = system.positions[:system.active_particles].astype(np.int32)
+        # Clear surfaces
+        self.particle_surface.fill((0, 0, 0, 0))
+        self.bond_surface.fill((0, 0, 0, 0))
         
-        # Create a new surface for this frame
-        particle_surface = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
-        
-        # Draw particles and bonds
-        self._draw_particles(system, particle_surface, positions)
-        self._draw_bonds(system, particle_surface, positions)  # Changed to draw on particle_surface
-        
-        # Blit the complete surface to the screen
-        screen.blit(particle_surface, (0, 0))
-
-    @profile_function(threshold_ms=0.5)
-    def _draw_particles(self, system, surface, positions):
-        # Pre-allocate arrays for better performance
-        active_elements = set(system.element_types[:system.active_particles])
-        
-        for element in active_elements:
-            # Get all particles of this element type at once
-            element_mask = system.element_types[:system.active_particles] == element
-            element_positions = positions[element_mask]
-            
-            # Get temperatures for all particles of this element at once
-            element_indices = np.where(element_mask)[0]
-            temps = np.array([system.chemical_properties[i].temperature 
-                             for i in element_indices])
-            
-            # Vectorized color calculations
-            element_color = np.array(ELEMENT_COLORS[element][:3])
-            hot_color = np.array([255, 200, 0])
-            temp_factors = np.clip((temps - 273.15) / 1000, 0, 1)
-            
-            # Vectorized color blending
-            colors = np.array([
-                tuple((element_color * (1 - tf) + hot_color * tf).astype(int))
-                for tf in temp_factors
-            ])
-            
-            # Draw particles using pygame.draw.rect for reliable rendering
-            for pos, color in zip(element_positions, colors):
-                x, y = pos.astype(int)
-                if 0 <= x < surface.get_width() - 2 and 0 <= y < surface.get_height() - 2:
-                    pygame.draw.rect(surface, color, (x, y, 2, 2))
-
-    @profile_function(threshold_ms=0.5)
-    def _draw_bonds(self, system, screen, positions):
-        # Pre-allocate bond surface
-        bond_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
-        processed_bonds = set()
-        
-        # Create lists for batch drawing
-        lines = []
-        colors = []
-        
+        # Draw particles using cached surfaces
         for i in range(system.active_particles):
-            pos1 = positions[i]
-            for bond in system.chemical_properties[i].bonds:
-                bond_key = tuple(sorted([i, bond.particle_id]))
-                if bond_key not in processed_bonds and bond.particle_id < system.active_particles:
-                    processed_bonds.add(bond_key)
-                    pos2 = positions[bond.particle_id]
+            pos = system.positions[i]
+            chem = system.chemical_properties[i]
+            element_id = chem.element_data.id
+            
+            # Use cached element surface
+            if element_id in self.element_surface_cache:
+                element_surf = self.element_surface_cache[element_id]
+                screen_pos = (
+                    int(pos[0] - PARTICLE_RADIUS),
+                    int(pos[1] - PARTICLE_RADIUS)
+                )
+                self.particle_surface.blit(element_surf, screen_pos)
+        
+        # Blit both surfaces to screen
+        screen.blit(self.bond_surface, (0, 0))
+        screen.blit(self.particle_surface, (0, 0))
+
+    def _batch_draw_bonds(self, system, visible_indices):
+        """Optimized bond drawing for visible particles only"""
+        if not visible_indices.size:
+            return
+        
+        # Pre-allocate lists for better performance
+        bond_lines = []
+        bond_colors = []
+        
+        # Only process bonds for visible particles
+        for i in visible_indices:
+            pos1 = system.positions[i]
+            chem1 = system.chemical_properties[i]
+            
+            # Only show bond count if bonds exist
+            if len(chem1.bonds) > 0:
+                font = pygame.font.Font(None, 24)
+                text = font.render(str(len(chem1.bonds)), True, (255, 255, 0))
+                self.particle_surface.blit(text, (int(pos1[0] - 6), int(pos1[1] - 6)))
+            
+            for bond in chem1.bonds:
+                if bond.particle_id < system.active_particles:
+                    pos2 = system.positions[bond.particle_id]
+                    screen_pos1 = (int(pos1[0]), int(pos1[1]))
+                    screen_pos2 = (int(pos2[0]), int(pos2[1]))
                     
-                    lines.append((pos1, pos2))
-                    colors.append((155 + int(bond.strength * 40),) * 3 if bond.bond_type == 'covalent' else (100, 100, 255))
+                    if self._is_bond_visible(screen_pos1, screen_pos2):
+                        bond_lines.append((screen_pos1, screen_pos2))
+                        bond_colors.append((255, 255, 255))  # Pure white
         
-        # Batch draw lines
-        if lines:
-            pygame.draw.lines(bond_surface, (255, 255, 255), False, lines[0], 1)
-            for line, color in zip(lines, colors):
-                pygame.draw.line(bond_surface, color, line[0], line[1], 1)
-        
-        screen.blit(bond_surface, (0, 0)) 
+        # Draw all bonds
+        if bond_lines:
+            for line, color in zip(bond_lines, bond_colors):
+                pygame.draw.line(self.bond_surface, (0, 0, 0), line[0], line[1], 8)  # Black border
+                pygame.draw.line(self.bond_surface, color, line[0], line[1], 4)      # White center
+
+    @staticmethod
+    def _is_bond_visible(pos1, pos2):
+        """Check if any part of the bond is visible on screen"""
+        return ((-PARTICLE_RADIUS <= max(pos1[0], pos2[0]) <= WINDOW_WIDTH + PARTICLE_RADIUS) and
+                (-PARTICLE_RADIUS <= max(pos1[1], pos2[1]) <= WINDOW_HEIGHT + PARTICLE_RADIUS))
