@@ -89,40 +89,12 @@ class Simulation:
         """Handle mouse down event"""
         mouse_pos = pygame.mouse.get_pos()
         
-        # Check mode switch button
-        if self.mode_button_rect.collidepoint(mouse_pos):
-            self.interaction_mode = (
-                INTERACTION_MODES['DRAG'] 
-                if self.interaction_mode == INTERACTION_MODES['CREATE'] 
-                else INTERACTION_MODES['CREATE']
-            )
+        # Let UI manager handle the click first
+        if self.ui_manager.handle_event(event):
             return True
         
-        # Calculate button position the same way as in _draw_sidebar
-        y_offset = self.ui_padding * 2 + (40 * 4)  # 4 stats * 40 pixels each
-        
-        button_rect = pygame.Rect(
-            self.ui_padding,
-            y_offset + 10,
-            self.sidebar_width - (self.ui_padding * 2),
-            self.button_height
-        )
-        
-        # Check if clear button was clicked
-        if mouse_pos[0] < self.sidebar_width:  # Only check if click is in sidebar
-            if button_rect.collidepoint(mouse_pos):
-                print("Clear button clicked")  # Debug print
-                self.particle_system.clear_particles()
-                # Force a GPU reset if needed
-                if hasattr(self.particle_system.physics, '_init_gpu'):
-                    self.particle_system.physics._init_gpu()
-                # Force immediate update of particle system
-                self.particle_system.update(self.current_delta)
-                return True
-        
-        if self._is_in_element_tabs(mouse_pos):
-            self._handle_tab_selection(mouse_pos)
-        elif self._is_in_simulation_area(mouse_pos):
+        # Handle simulation area clicks
+        if self._is_in_simulation_area(mouse_pos):
             if self.interaction_mode == INTERACTION_MODES['CREATE']:
                 self.mouse_down = True
             else:  # DRAG mode
