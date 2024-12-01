@@ -12,7 +12,6 @@ from utils.profiler import profile_function
 from physics.chemical_particle import Bond
 from typing import Optional
 from physics.bond_system import BondSystem
-
 class CollisionHandler:
     @staticmethod
     @profile_function(threshold_ms=0.5)
@@ -511,3 +510,4 @@ class CollisionHandler:
         
         system.velocities[idx1] = avg_velocity + perpendicular * energy_release
         system.velocities[idx2] = avg_velocity - perpendicular * energy_release
+

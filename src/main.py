@@ -63,16 +63,28 @@ class Simulation:
             if event.type == QUIT:
                 return False
             
-            # Let UI handle events first
+            # Handle scroll events before UI manager
+            if event.type == MOUSEBUTTONDOWN and event.button in (4, 5):
+                if event.button == 4:  # Mouse wheel up
+                    print("Scroll up detected")
+                    self.particles_per_burst = min(100, self.particles_per_burst + 5)
+                else:  # Mouse wheel down
+                    print("Scroll down detected")
+                    self.particles_per_burst = max(1, self.particles_per_burst - 5)
+                continue
+            
+            # Let UI handle other events
             if self.ui_manager.handle_event(event):
+                print("Event handled by UI manager")
                 continue
             
             # Handle remaining simulation events
             if event.type == MOUSEBUTTONDOWN:
-                if event.button == 4:  # Mouse wheel up
-                    self.particles_per_burst = min(100, self.particles_per_burst + 5)
-                elif event.button == 5:  # Mouse wheel down
-                    self.particles_per_burst = max(1, self.particles_per_burst - 5)
+                return self._handle_mouse_down(event)
+            elif event.type == MOUSEBUTTONUP:
+                self._handle_mouse_up(event)
+            elif event.type == MOUSEMOTION:
+                self._handle_mouse_motion(event)
         return True
     
     def _handle_mouse_down(self, event):
@@ -116,7 +128,12 @@ class Simulation:
             if self.interaction_mode == INTERACTION_MODES['CREATE']:
                 self.mouse_down = True
             else:  # DRAG mode
-                self.particle_system.physics.start_drag(self.particle_system, mouse_pos)
+                # Adjust mouse position to simulation coordinates
+                adjusted_pos = (
+                    mouse_pos[0] - SIMULATION_X_OFFSET,
+                    mouse_pos[1] - SIMULATION_Y_OFFSET
+                )
+                self.particle_system.physics.start_drag(self.particle_system, adjusted_pos)
         
         return False
     
@@ -143,7 +160,12 @@ class Simulation:
     def _handle_mouse_motion(self, event):
         """Handle mouse motion event"""
         if self.interaction_mode == INTERACTION_MODES['DRAG']:
-            self.particle_system.physics.update_drag(self.particle_system, event.pos)
+            # Adjust mouse position to simulation coordinates
+            adjusted_pos = (
+                event.pos[0] - SIMULATION_X_OFFSET,
+                event.pos[1] - SIMULATION_Y_OFFSET
+            )
+            self.particle_system.physics.update_drag(self.particle_system, adjusted_pos)
     
     def update(self):
         """Update simulation state"""

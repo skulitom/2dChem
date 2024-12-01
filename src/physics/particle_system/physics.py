@@ -217,7 +217,7 @@ class PhysicsHandler:
         # Define boundaries relative to simulation area
         left_boundary = PARTICLE_RADIUS * 2  # Add padding
         right_boundary = SIMULATION_WIDTH - PARTICLE_RADIUS * 4  # Increase right boundary padding
-        floor_level = SIMULATION_HEIGHT - FLOOR_BUFFER - PARTICLE_RADIUS * 4  # Increase floor padding
+        floor_level = SIMULATION_HEIGHT - PARTICLE_RADIUS  # Adjusted floor level
         
         # Handle horizontal boundaries with stronger response
         x_left_violation = positions[:, 0] < left_boundary
@@ -397,8 +397,10 @@ class PhysicsHandler:
         positions = system.positions[active_slice]
         velocities = system.velocities[active_slice]
         
+        # Adjust floor level to remove extra padding
+        floor_level = SIMULATION_HEIGHT - PARTICLE_RADIUS  # Adjusted floor level
+        
         # Floor collision
-        floor_level = SIMULATION_HEIGHT - FLOOR_BUFFER - PARTICLE_RADIUS
         floor_collision = positions[:, 1] > floor_level
         positions[floor_collision, 1] = floor_level
         velocities[floor_collision, 1] *= -COLLISION_RESPONSE
@@ -439,8 +441,8 @@ class PhysicsHandler:
                system.velocities[active_slice] * delta_time, 
                out=self._predicted_positions)
         
-        # Efficient boundary handling
-        floor_level = SIMULATION_HEIGHT - FLOOR_BUFFER - PARTICLE_RADIUS
+        # Set floor level at the bottom edge of the visible frame
+        floor_level = SIMULATION_HEIGHT - PARTICLE_RADIUS  # Adjusted floor level
         floor_collision = self._predicted_positions[:, 1] >= floor_level
         
         if np.any(floor_collision):
