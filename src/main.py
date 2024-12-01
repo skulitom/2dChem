@@ -40,6 +40,8 @@ class Simulation:
     def _init_ui_config(self):
         """Initialize UI configuration values"""
         self.ui_manager = UIManager(self)
+        self.sidebar_width = SIMULATION_X_OFFSET
+        self.tab_height = SIMULATION_Y_OFFSET
     
     def _init_state(self):
         """Initialize simulation state"""
