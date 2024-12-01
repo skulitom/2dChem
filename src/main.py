@@ -66,10 +66,8 @@ class Simulation:
             # Handle scroll events before UI manager
             if event.type == MOUSEBUTTONDOWN and event.button in (4, 5):
                 if event.button == 4:  # Mouse wheel up
-                    print("Scroll up detected")
                     self.particles_per_burst = min(100, self.particles_per_burst + 5)
                 else:  # Mouse wheel down
-                    print("Scroll down detected")
                     self.particles_per_burst = max(1, self.particles_per_burst - 5)
                 continue
             

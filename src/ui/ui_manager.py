@@ -18,7 +18,7 @@ class UIManager:
         self.simulation_area = SimulationArea(simulation)
         
     def handle_event(self, event):
-        """Handle UI events and return True if event was handled"""
+        """Handle UI events and return True if event was handled."""
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
             

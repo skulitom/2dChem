@@ -7,11 +7,15 @@ from core.constants import (
 import logging
 
 # Configure all CUDA-related logging to only show errors
-logging.getLogger('numba').setLevel(logging.ERROR)
-logging.getLogger('numba.cuda.cudadrv.driver').setLevel(logging.ERROR)
-logging.getLogger('numba.cuda.cudadrv.runtime').setLevel(logging.ERROR)
-logging.getLogger('numba.cuda.cudadrv.nvvm').setLevel(logging.ERROR)
-logging.getLogger('numba.cuda.cudadrv.cuda').setLevel(logging.ERROR)
+cuda_loggers = [
+    'numba',
+    'numba.cuda.cudadrv.driver',
+    'numba.cuda.cudadrv.runtime',
+    'numba.cuda.cudadrv.nvvm',
+    'numba.cuda.cudadrv.cuda'
+]
+for logger_name in cuda_loggers:
+    logging.getLogger(logger_name).setLevel(logging.ERROR)
 
 # CUDA constants need to be defined at module level
 CUDA_MAX_VELOCITY = 20.0
@@ -66,13 +70,15 @@ def handle_collisions_gpu(positions, velocities, active_particles):
         velocities[particle_idx, 0] *= -CUDA_COLLISION_RESPONSE
     
     # Shared memory for position data
-    pos_shared = cuda.shared.array(shape=(256, 2), dtype=float32)
-    vel_shared = cuda.shared.array(shape=(256, 2), dtype=float32)
+    tx = cuda.threadIdx.x
+    block_size = cuda.blockDim.x
+    pos_shared = cuda.shared.array(shape=(block_size, 2), dtype=float32)
+    vel_shared = cuda.shared.array(shape=(block_size, 2), dtype=float32)
     
     # Load position and velocity into shared memory
-    tx = cuda.threadIdx.x
-    pos_shared[tx] = positions[particle_idx]
-    vel_shared[tx] = velocities[particle_idx]
+    if particle_idx < positions.shape[0]:
+        pos_shared[tx] = positions[particle_idx]
+        vel_shared[tx] = velocities[particle_idx]
     cuda.syncthreads()
     
     # Handle particle collisions

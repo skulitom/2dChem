@@ -7,6 +7,7 @@ from core.constants import (
 )
 from physics.chemical_particle import ChemicalParticle
 from utils.profiler import profile_function
+import logging
 
 __all__ = ['ParticleSystemCore']
 
@@ -62,7 +63,7 @@ class ParticleSystemCore:
 
     def clear_particles(self):
         """Clear all particles from the system."""
-        # First break all bonds
+        # First, break all bonds
         for idx in range(self.active_particles):
             try:
                 if idx in self.chemical_properties:
@@ -70,34 +71,19 @@ class ParticleSystemCore:
                     if hasattr(particle, 'break_all_bonds'):
                         particle.break_all_bonds()
             except Exception as e:
-                print(f"Warning: Error breaking bonds for particle {idx}: {e}")
-        
+                logging.warning(f"Error breaking bonds for particle {idx}: {e}")
+
+        # Reset system state
         try:
-            # Clear chemical properties first
             self.chemical_properties.clear()
-            
-            # Reset counters and masks
             self.active_particles = 0
             self.active_mask.fill(False)
-            
-            # Reset arrays
             self.positions.fill(0)
             self.velocities.fill(0)
             self.element_types.fill('')
-            
-            # Reset any GPU resources if they exist
-            if hasattr(self, 'physics'):
-                try:
-                    if hasattr(self.physics, 'positions_gpu'):
-                        del self.physics.positions_gpu
-                    if hasattr(self.physics, 'velocities_gpu'):
-                        del self.physics.velocities_gpu
-                except Exception as e:
-                    print(f"Warning: Error cleaning up GPU resources: {e}")
-                
         except Exception as e:
-            print(f"Error in clear_particles: {e}")
-            # Try to reset to a safe state
+            logging.error(f"Error in clear_particles: {e}")
+            # Ensure system is in a safe state
             self.active_particles = 0
             self.active_mask.fill(False)
             self.chemical_properties = {}

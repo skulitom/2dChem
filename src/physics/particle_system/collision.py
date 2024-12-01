@@ -455,46 +455,24 @@ class CollisionHandler:
         """Enhanced chemical interaction handling"""
         chem1 = system.chemical_properties[idx1]
         chem2 = system.chemical_properties[idx2]
-        
+
         # Calculate distance
         pos_diff = system.positions[idx1] - system.positions[idx2]
-        distance = np.sqrt(np.dot(pos_diff, pos_diff))
-        
-        print(f"\n=== Chemical Interaction ===")
-        print(f"Distance: {distance}")
-        
-        # More lenient distance check based on particle radii
-        combined_radius = (chem1.element_data.radius + chem2.element_data.radius) * 20  # Match display scaling
-        print(f"Combined radius threshold: {combined_radius}")
-        
-        if distance > combined_radius * 1.5:  # Allow 50% more distance for bonding
-            print("Too far for bonding")
-            return False
-        
+        distance = np.linalg.norm(pos_diff)
+
         # Check if bonding is possible based on element properties
         bond_config = chem1.element_data.possible_bonds.get(chem2.element_data.id)
-        print(f"Bond configuration: {bond_config}")
-        
         if not bond_config:
-            print("No valid bond configuration")
             return False
-        
-        # Check current bond counts
-        print(f"Current bonds: {len(chem1.bonds)} and {len(chem2.bonds)}")
-        print(f"Max bonds: {chem1.max_bonds} and {chem2.max_bonds}")
-        
-        # Try to form the bond if conditions are met
-        if (len(chem1.bonds) < chem1.max_bonds and 
+
+        # Check if bonding is possible considering max bonds
+        if (len(chem1.bonds) < chem1.max_bonds and
             len(chem2.bonds) < chem2.max_bonds):
             success = CollisionHandler._try_form_bond(system, idx1, idx2, distance)
-            print(f"Bond formation result: {success}")
             if success:
-                # Update particle velocities to reflect bonding
+                # Apply bonding effects
                 CollisionHandler._apply_bonding_effects(system, idx1, idx2)
                 return True
-        else:
-            print("Maximum bonds reached for one or both particles")
-        
         return False
 
     @staticmethod
