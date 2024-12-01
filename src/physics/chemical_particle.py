@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Set, Optional, Dict
-import numpy as np
+from typing import List, Optional
 from core.element_data import ELEMENT_DATA, ElementProperties
 from core.constants import DEBUG_MODE
 from .element_loader import ElementLoader

@@ -8,6 +8,7 @@ from core.constants import (
     ELECTROMAGNETIC_CONSTANT, DRAG_FORCE_MULTIPLIER
 )
 from utils.profiler import profile_function
+from physics.particle_system.collision import CollisionHandler
 
 # Physics constants
 CUDA_MAX_VELOCITY = 20.0

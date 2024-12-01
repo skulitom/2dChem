@@ -1,6 +1,4 @@
 import numpy as np
-from pygame import Color
-import numpy as np
 
 from core.constants import (
     SIMULATION_WIDTH, SIMULATION_HEIGHT

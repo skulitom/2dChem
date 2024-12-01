@@ -2,8 +2,7 @@ import pygame
 import numpy as np
 from core.constants import (
     WINDOW_WIDTH, WINDOW_HEIGHT, 
-    PARTICLE_RADIUS,
-    ELEMENT_COLORS
+    PARTICLE_RADIUS
 )
 from core.element_data import ELEMENT_DATA
 from utils.profiler import profile_function

@@ -1,7 +1,6 @@
 from numba import cuda, float32, int32
 import numpy as np
 from core.constants import (
-    GRAVITY, COLLISION_RESPONSE, MAX_VELOCITY,
     SIMULATION_X_OFFSET, SIMULATION_WIDTH, PARTICLE_RADIUS
 )
 import logging

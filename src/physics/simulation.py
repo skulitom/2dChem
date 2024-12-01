@@ -55,11 +55,4 @@ def _solve_self_collisions(particle_data : ParticleData):
                 particle_data.positions[left_el_id] = mid_point + vector * particle_data.radius
                 particle_data.positions[right_el_id] = mid_point - vector * particle_data.radius
 
-def solve(particle_data_list : list):
-    pass
-#    for particle_data in particle_data_list:
-#        _solve_velocities(particle_data)
-#        _solve_positions(particle_data)
-#        _solve_self_collisions(particle_data)
-#        _solve_borders_constrains(particle_data)
 

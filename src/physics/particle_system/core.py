@@ -1,9 +1,7 @@
 import numpy as np
 from core.constants import (
-    WINDOW_WIDTH, WINDOW_HEIGHT,
-    PARTICLE_SPREAD, VELOCITY_SCALE,
-    SIMULATION_WIDTH, SIMULATION_HEIGHT,
-    SIMULATION_X_OFFSET, SIMULATION_Y_OFFSET
+    PARTICLE_SPREAD, 
+    SIMULATION_WIDTH, SIMULATION_HEIGHT
 )
 from physics.chemical_particle import ChemicalParticle
 from utils.profiler import profile_function
