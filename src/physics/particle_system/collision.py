@@ -47,8 +47,12 @@ class CollisionHandler:
     @staticmethod
     def _try_form_bond(system, idx1, idx2, distance) -> bool:
         """Try to form a bond between two particles"""
+        chem1 = system.chemical_properties[idx1]
+        chem2 = system.chemical_properties[idx2]
+
+        # Check bond formation conditions first
         if not BondSystem.check_bond_formation_conditions(system, idx1, idx2, distance):
-            combined_radius = (idx1.element_data.radius + idx2.element_data.radius) * 20.0
+            combined_radius = (chem1.element_data.radius + chem2.element_data.radius) * 20.0
             ideal_bond_distance = combined_radius * 1.2
             min_distance = ideal_bond_distance * 0.7
             max_distance = ideal_bond_distance * 1.5
@@ -56,9 +60,11 @@ class CollisionHandler:
             if distance < min_distance or distance > max_distance:
                 return False
 
+        # Check bond angle validity
         if not CollisionHandler._check_bond_angle_validity(system, idx1, idx2):
             return False
 
+        # Attempt actual bond creation
         bonds = BondSystem.create_bond(system, idx1, idx2)
         if not bonds:
             return False
@@ -118,7 +124,6 @@ class CollisionHandler:
     def _would_complete_ring(system, idx1, idx2) -> bool:
         """Check if adding a bond between idx1 and idx2 would complete a ring.
            This is a placeholder; implement proper ring detection as needed."""
-        # Implement actual cycle detection in the molecular graph if required.
         return False
 
     @staticmethod
@@ -282,8 +287,8 @@ class CollisionHandler:
             system.velocities[idx1] -= impulse * (mass2 / total_mass)
             system.velocities[idx2] += impulse * (mass1 / total_mass)
 
-        overlap = (system.chemical_properties[idx1].element_data.radius +
-                   system.chemical_properties[idx2].element_data.radius) - distance
+        overlap = ((system.chemical_properties[idx1].element_data.radius +
+                    system.chemical_properties[idx2].element_data.radius) - distance)
         if overlap > 0:
             separation = direction * overlap * 0.3
             system.positions[idx1] += separation
@@ -321,6 +326,7 @@ class CollisionHandler:
         elif hybrid1 == 'sp2':
             target_angle = 120.0
         else:
+            # If it's another hybridization, assume no strict angle check
             return True
 
         # Check angles with existing bonds

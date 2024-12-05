@@ -19,6 +19,7 @@ class ParticleSystemCore:
         self.chemical_properties = {}
         self._initialize_arrays()
         self._initialize_grid()
+        self.sound_manager = None  # Will be set from outside
 
     def _initialize_arrays(self):
         """Initialize arrays for particle positions and velocities."""
@@ -117,6 +118,10 @@ class ParticleSystemCore:
             self.element_types[idx] = element_type
             self.active_mask[idx] = True
             self.active_particles += 1
+            
+            # Play creation sound if sound manager is available
+            if self.sound_manager:
+                self.sound_manager.play_creation_sound(element_type)
             
             print(f"Created particle {idx} of type {element_type}")
             return idx

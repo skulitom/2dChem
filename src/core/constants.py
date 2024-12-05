@@ -145,6 +145,10 @@ INTERACTION_MODES = {
     'DRAG': 'drag'
 }
 
+# Audio Settings
+MASTER_VOLUME = 0.3
+ENABLE_SOUND = True
+
 print("\n=== Window Configuration ===")
 print(f"Window dimensions: {WINDOW_WIDTH}x{WINDOW_HEIGHT}")
 print(f"Simulation area: {SIMULATION_WIDTH}x{SIMULATION_HEIGHT}")

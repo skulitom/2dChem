@@ -9,6 +9,8 @@ from core.constants import (
 )
 from utils.profiler import profile_function
 from physics.particle_system.collision import CollisionHandler
+from physics.particle_system.gpu_accelerator import update_positions_gpu, update_velocities_gpu, handle_collisions_gpu
+
 
 # Physics constants
 CUDA_MAX_VELOCITY = 20.0
@@ -105,18 +107,21 @@ class PhysicsHandler:
         self.gpu_batch_threshold = 32
         self.dragged_particle = None
         self.drag_offset = None
-        self.drag_force_multiplier = 5.0  # Increased for more responsive dragging
+        self.drag_force_multiplier = 5.0
         self.particle_radii = None
-        
+
+        self.grid_cell_size = 3.0 * 2.5  # slightly larger than max interaction distance
+        self.grid_cells_x = int(np.ceil(SIMULATION_WIDTH / self.grid_cell_size))
+        self.grid_cells_y = int(np.ceil(SIMULATION_HEIGHT / self.grid_cell_size))
+
         self._init_gpu()
-    
+
     def _init_gpu(self):
-        """Lazy initialization of GPU to avoid startup delay."""
         try:
             cuda.select_device(0)
             self.use_gpu = True
-            self.threads_per_block = THREADS_PER_BLOCK
-            self.max_blocks = MAX_BLOCKS
+            self.threads_per_block = 128
+            self.max_blocks = 256
             
             # Warm up kernels
             dummy_size = 128
@@ -128,10 +133,144 @@ class PhysicsHandler:
             vel_dev = cuda.to_device(dummy_velocities)
             update_positions_gpu[blocks, self.threads_per_block](pos_dev, vel_dev, 0.016)
             update_velocities_gpu[blocks, self.threads_per_block](vel_dev, 0.016)
-            # No need to warm up collision here, just ensuring kernels compile.
         except Exception as e:
             print(f"CUDA device not available, using CPU: {e}")
             self.use_gpu = False
+
+    def _build_spatial_hash(self, positions):
+        """Build a spatial hash for particles to reduce collision checks.
+
+        Returns:
+        - particle_indices: array of particle indices sorted by cell
+        - cell_start: start index of each cell in particle_indices
+        - cell_end: end index of each cell in particle_indices
+        """
+        num_particles = positions.shape[0]
+        # Compute cell indices for each particle
+        cell_indices = np.empty(num_particles, dtype=np.int32)
+        for i in range(num_particles):
+            x = int(positions[i, 0] / self.grid_cell_size)
+            y = int(positions[i, 1] / self.grid_cell_size)
+            # Clamp indices
+            if x < 0: x = 0
+            if x >= self.grid_cells_x: x = self.grid_cells_x - 1
+            if y < 0: y = 0
+            if y >= self.grid_cells_y: y = self.grid_cells_y - 1
+            cell_idx = y * self.grid_cells_x + x
+            cell_indices[i] = cell_idx
+
+        # Sort particles by cell index
+        sorted_indices = np.argsort(cell_indices)
+        particle_indices = sorted_indices.astype(np.int32)
+
+        # Build prefix arrays
+        cell_start = np.full(self.grid_cells_x * self.grid_cells_y, -1, dtype=np.int32)
+        cell_end = np.full(self.grid_cells_x * self.grid_cells_y, -1, dtype=np.int32)
+
+        # Assign start/end indices
+        if num_particles > 0:
+            current_cell = cell_indices[particle_indices[0]]
+            cell_start[current_cell] = 0
+
+            for i in range(1, num_particles):
+                cell_id = cell_indices[particle_indices[i]]
+                prev_cell_id = cell_indices[particle_indices[i - 1]]
+                if cell_id != prev_cell_id:
+                    cell_end[prev_cell_id] = i
+                    cell_start[cell_id] = i
+
+            last_cell_id = cell_indices[particle_indices[-1]]
+            cell_end[last_cell_id] = num_particles
+
+        return particle_indices, cell_start, cell_end
+
+    def _handle_boundaries_vectorized(self, system):
+        active_slice = slice(system.active_particles)
+        positions = system.positions[active_slice]
+        velocities = system.velocities[active_slice]
+
+        left_boundary = PARTICLE_RADIUS * 2.0
+        right_boundary = SIMULATION_WIDTH - PARTICLE_RADIUS * 4.0
+        floor_level = SIMULATION_HEIGHT - PARTICLE_RADIUS
+
+        x_left_violation = positions[:, 0] < left_boundary
+        x_right_violation = positions[:, 0] > right_boundary
+
+        positions[x_left_violation, 0] = left_boundary
+        positions[x_right_violation, 0] = right_boundary
+        velocities[x_left_violation, 0] *= -COLLISION_RESPONSE * 1.2
+        velocities[x_right_violation, 0] *= -COLLISION_RESPONSE * 1.2
+
+        y_floor_violation = positions[:, 1] > floor_level
+        positions[y_floor_violation, 1] = floor_level
+
+        floor_collision = y_floor_violation & (velocities[:, 1] > 0)
+        if np.any(floor_collision):
+            velocities[floor_collision, 1] *= -COLLISION_RESPONSE
+            velocities[floor_collision, 0] *= 0.95
+
+        floor_contact = positions[:, 1] >= floor_level - 0.1
+        slow_velocity = np.abs(velocities[:, 1]) < MIN_BOUNCE_VELOCITY
+        stop_mask = floor_contact & slow_velocity
+        velocities[stop_mask, 1] = 0
+        positions[stop_mask, 1] = floor_level
+
+    def _update_gpu(self, system, dt):
+        active_slice = slice(system.active_particles)
+        num_particles = system.active_particles
+        if num_particles == 0:
+            return
+
+        threads_per_block = self.threads_per_block
+        blocks = (num_particles + threads_per_block - 1) // threads_per_block
+
+        if blocks == 0:
+            self._update_cpu(system, dt)
+            return
+
+        # Update radii array if needed
+        if self.particle_radii is None or len(self.particle_radii) < system.active_particles:
+            radii = []
+            for i in range(num_particles):
+                chem = system.chemical_properties[i]
+                radius = chem.element_data.radius * 20.0
+                radii.append(radius)
+            self.particle_radii = np.array(radii, dtype=np.float32)
+        else:
+            # Update existing radii if necessary
+            for i in range(num_particles):
+                chem = system.chemical_properties[i]
+                self.particle_radii[i] = chem.element_data.radius * 20.0
+
+        positions_f32 = system.positions[active_slice].astype(np.float32, copy=False)
+        velocities_f32 = system.velocities[active_slice].astype(np.float32, copy=False)
+
+        # Build spatial hash on CPU
+        particle_indices, cell_start, cell_end = self._build_spatial_hash(positions_f32)
+
+        # Copy data to device
+        positions_gpu = cuda.to_device(positions_f32)
+        velocities_gpu = cuda.to_device(velocities_f32)
+        radii_gpu = cuda.to_device(self.particle_radii)
+        particle_indices_gpu = cuda.to_device(particle_indices)
+        cell_start_gpu = cuda.to_device(cell_start)
+        cell_end_gpu = cuda.to_device(cell_end)
+
+        update_velocities_gpu[blocks, threads_per_block](velocities_gpu, dt)
+        update_positions_gpu[blocks, threads_per_block](positions_gpu, velocities_gpu, dt)
+
+        handle_collisions_gpu[blocks, threads_per_block](
+            positions_gpu, velocities_gpu, radii_gpu, num_particles,
+            particle_indices_gpu, cell_start_gpu, cell_end_gpu,
+            self.grid_cells_x, self.grid_cells_y,
+            float32(self.grid_cell_size), float32(self.grid_cell_size)
+        )
+
+        # Copy results back
+        positions_gpu.copy_to_host(system.positions[active_slice])
+        velocities_gpu.copy_to_host(system.velocities[active_slice])
+
+        self._handle_boundaries_vectorized(system)
 
     def _handle_boundaries_vectorized(self, system):
         active_slice = slice(system.active_particles)
