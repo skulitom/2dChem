@@ -25,6 +25,10 @@ class Simulation:
         
         # Initialize remaining components
         self._init_state()
+        
+        # Initialize surfaces after we know sidebar and tab dimensions
+        self._init_surfaces()
+        
         self.profiler = Profiler()
         self.profiler.start()
         
@@ -42,6 +46,16 @@ class Simulation:
         self.ui_manager = UIManager(self)
         self.sidebar_width = SIMULATION_X_OFFSET
         self.tab_height = SIMULATION_Y_OFFSET
+        
+        # Define UI metrics and fonts
+        self.ui_padding = 10
+        self.tab_width = 50
+        self.tab_padding = 10
+        self.corner_radius = 5
+        self.button_height = 40
+        self.elements = ['H', 'O', 'C', 'N']  # Example elements
+        self.stats_font = pygame.font.Font(None, 24)
+        self.element_font = pygame.font.Font(None, 24)
     
     def _init_state(self):
         """Initialize simulation state"""
@@ -75,7 +89,6 @@ class Simulation:
             
             # Let UI handle other events
             if self.ui_manager.handle_event(event):
-                print("Event handled by UI manager")
                 continue
             
             # Handle remaining simulation events
@@ -121,7 +134,7 @@ class Simulation:
         """Handle element tab selection"""
         adjusted_x = mouse_pos[0] - self.sidebar_width
         tab_idx = adjusted_x // (self.tab_width + self.tab_padding)
-        if tab_idx < len(self.elements):
+        if 0 <= tab_idx < len(self.elements):
             self.selected_element = self.elements[tab_idx]
     
     def _handle_mouse_up(self, event):
@@ -146,7 +159,8 @@ class Simulation:
         # Only create particles while mouse is held down
         if self.mouse_down and self.interaction_mode == INTERACTION_MODES['CREATE']:
             mouse_pos = pygame.mouse.get_pos()
-            if self.ui_manager.simulation_area.is_point_inside(mouse_pos):  # Only create particles in simulation area
+            # Check if inside simulation area via UI manager
+            if hasattr(self.ui_manager, 'simulation_area') and self.ui_manager.simulation_area.is_point_inside(mouse_pos):
                 # Adjust mouse position relative to simulation area
                 adjusted_pos = (
                     mouse_pos[0] - SIMULATION_X_OFFSET,
@@ -164,6 +178,8 @@ class Simulation:
     
     def _draw_sidebar(self):
         """Draw the sidebar with stats and info"""
+        self.sidebar.fill((0, 0, 0, 0))
+        
         # Draw main panel with gradient
         gradient_rect = pygame.Surface((self.sidebar_width, WINDOW_HEIGHT), pygame.SRCALPHA)
         for i in range(WINDOW_HEIGHT):
@@ -172,7 +188,7 @@ class Simulation:
             pygame.draw.line(gradient_rect, color, (0, i), (self.sidebar_width, i))
         self.sidebar.blit(gradient_rect, (0, 0))
         
-        # Draw stats with enhanced styling
+        # Draw stats
         y_offset = self.ui_padding * 2
         stats = [
             f'FPS: {int(self.clock.get_fps())}',
@@ -182,7 +198,6 @@ class Simulation:
         ]
         
         for stat in stats:
-            # Draw stat background with subtle gradient
             stat_rect = pygame.Rect(
                 self.ui_padding - 4,
                 y_offset - 4,
@@ -195,16 +210,15 @@ class Simulation:
             for i in range(stat_rect.height):
                 alpha = 150 - (i // 2)
                 pygame.draw.line(gradient_surface, (*UI_COLORS['PANEL'], alpha),
-                               (0, i), (stat_rect.width, i))
+                                 (0, i), (stat_rect.width, i))
             self.sidebar.blit(gradient_surface, stat_rect)
             
-            # Clean text rendering without glow
             text = self.stats_font.render(stat, True, UI_COLORS['TEXT'])
             self.sidebar.blit(text, (self.ui_padding, y_offset))
             
             y_offset += 40
 
-        # Store the button position for consistent reference
+        # Clear button
         self.clear_button_rect = pygame.Rect(
             self.ui_padding,
             y_offset + 10,
@@ -212,29 +226,35 @@ class Simulation:
             self.button_height
         )
         
-        # Draw Clear button using stored rect
         gradient_surface = pygame.Surface(self.clear_button_rect.size, pygame.SRCALPHA)
         height = self.clear_button_rect.height
         for i in range(height):
             progress = i / height
             alpha = int(255 * (1 - progress * 0.2))  # Subtler gradient
-            color = UI_COLORS['TAB_HOVER'] if self.clear_button_rect.collidepoint(pygame.mouse.get_pos()) else UI_COLORS['PANEL']
+            color = (UI_COLORS['TAB_HOVER'] if self.clear_button_rect.collidepoint(pygame.mouse.get_pos()) 
+                     else UI_COLORS['PANEL'])
             color = (*color, alpha)
             pygame.draw.line(gradient_surface, color, 
-                            (0, i), (self.clear_button_rect.width, i))
+                             (0, i), (self.clear_button_rect.width, i))
         
-        # Apply gradient and border
         self.sidebar.blit(gradient_surface, self.clear_button_rect)
         pygame.draw.rect(self.sidebar, UI_COLORS['BORDER'], self.clear_button_rect, 1,
-                        border_radius=self.corner_radius)
+                         border_radius=self.corner_radius)
         
-        # Clean button text rendering
         clear_text = self.stats_font.render("Clear Particles", True, 
-                                          UI_COLORS['HIGHLIGHT'] if self.clear_button_rect.collidepoint(pygame.mouse.get_pos()) else UI_COLORS['TEXT'])
+                                            UI_COLORS['HIGHLIGHT'] if self.clear_button_rect.collidepoint(pygame.mouse.get_pos()) 
+                                            else UI_COLORS['TEXT'])
         text_rect = clear_text.get_rect(center=self.clear_button_rect.center)
         self.sidebar.blit(clear_text, text_rect)
         
-        # Draw mode switch button
+        # Mode switch button (define rect before use)
+        self.mode_button_rect = pygame.Rect(
+            self.ui_padding,
+            self.clear_button_rect.bottom + 20,
+            self.sidebar_width - (self.ui_padding * 2),
+            self.button_height
+        )
+        
         pygame.draw.rect(self.sidebar, UI_COLORS['PANEL'], self.mode_button_rect)
         mode_text = f"Mode: {'Drag' if self.interaction_mode == INTERACTION_MODES['DRAG'] else 'Create'}"
         mode_surface = self.font.render(mode_text, True, UI_COLORS['TEXT'])
@@ -242,14 +262,16 @@ class Simulation:
         self.sidebar.blit(mode_surface, mode_rect)
     
     def _draw_element_tabs(self):
-        """Draw the element selection tabs with enhanced styling"""
+        """Draw the element selection tabs"""
+        self.element_tabs.fill((0,0,0,0))
+        
         # Draw tab panel background with gradient
         gradient_rect = pygame.Surface((WINDOW_WIDTH - self.sidebar_width, self.tab_height), pygame.SRCALPHA)
         for i in range(self.tab_height):
             alpha = min(240, 180 + i // 2)
             color = (*UI_COLORS['PANEL'], alpha)
             pygame.draw.line(gradient_rect, color,
-                            (0, i), (WINDOW_WIDTH - self.sidebar_width, i))
+                             (0, i), (WINDOW_WIDTH - self.sidebar_width, i))
         self.element_tabs.blit(gradient_rect, (0, 0))
         
         mouse_pos = pygame.mouse.get_pos()
@@ -262,9 +284,8 @@ class Simulation:
             # Determine tab state
             is_selected = element == self.selected_element
             is_hovered = (tab_rect.collidepoint(adjusted_mouse_x, mouse_pos[1]) and 
-                         mouse_pos[1] < self.tab_height)
+                          mouse_pos[1] < self.tab_height)
             
-            # Refined tab gradient
             gradient_surface = pygame.Surface(tab_rect.size, pygame.SRCALPHA)
             height = tab_rect.height
             for y in range(height):
@@ -279,21 +300,20 @@ class Simulation:
                     color = (*UI_COLORS['PANEL'], alpha)
                     
                 pygame.draw.line(gradient_surface, color,
-                               (0, y), (tab_rect.width, y))
+                                 (0, y), (tab_rect.width, y))
             
-            # Apply gradient
             self.element_tabs.blit(gradient_surface, tab_rect)
             
             # Draw tab border for non-selected tabs
             if not is_selected:
                 pygame.draw.rect(self.element_tabs, UI_COLORS['BORDER'],
-                               tab_rect, 1, border_radius=self.corner_radius)
+                                 tab_rect, 1, border_radius=self.corner_radius)
             
-            # Clean text rendering for element symbols
+            # Text color
             if is_selected:
                 text_color = UI_COLORS['TEXT']
             elif is_hovered:
-                text_color = (*UI_COLORS['TEXT'], 220)  # Slightly dimmed on hover
+                text_color = (*UI_COLORS['TEXT'], 220)
             else:
                 text_color = ELEMENT_COLORS[element]
                 
@@ -303,7 +323,26 @@ class Simulation:
     
     def draw(self):
         """Draw the simulation"""
+        self.screen.fill(BLACK)
+        
+        # Draw the sidebar and element tabs
+        self._draw_sidebar()
+        self._draw_element_tabs()
+        
+        # Draw particles on simulation_area surface
+        self.simulation_area.fill(BLACK)
+        self.particle_system.draw(self.simulation_area)
+        
+        # Blit surfaces to the screen
+        self.screen.blit(self.sidebar, (0, 0))
+        self.screen.blit(self.element_tabs, (self.sidebar_width, 0))
+        self.screen.blit(self.simulation_area, (self.sidebar_width, self.tab_height))
+        
+        # Finally, draw the UI manager components (if any)
         self.ui_manager.draw()
+        
+        # Update the display
+        pygame.display.flip()
     
     def run(self):
         running = True
@@ -327,4 +366,4 @@ class Simulation:
 
 if __name__ == '__main__':
     simulation = Simulation()
-    simulation.run() 
+    simulation.run()

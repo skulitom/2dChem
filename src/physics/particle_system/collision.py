@@ -276,7 +276,8 @@ class CollisionHandler:
         relative_velocity = system.velocities[idx1] - system.velocities[idx2]
         approach_speed = np.dot(relative_velocity, direction)
 
-        if approach_speed > 0:
+        # Only apply a collision response if they're actually moving towards each other
+        if approach_speed < 0:
             damping = COLLISION_DAMPING
             impulse = direction * approach_speed * COLLISION_RESPONSE * damping
 
@@ -293,6 +294,7 @@ class CollisionHandler:
             separation = direction * overlap * 0.3
             system.positions[idx1] += separation
             system.positions[idx2] -= separation
+
 
     @staticmethod
     @profile_function(threshold_ms=0.5)
